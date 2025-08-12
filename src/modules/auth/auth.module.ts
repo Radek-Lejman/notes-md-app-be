@@ -18,6 +18,6 @@ import refreshJwtConfig from './config/refreshJwt.config';
     ConfigModule.forFeature(refreshJwtConfig),
   ],
   providers: [AuthService, PrismaService, JwtService, JwtInnerService],
-  exports: [],
+  exports: [JwtInnerService],
 })
 export class AuthModule {}
