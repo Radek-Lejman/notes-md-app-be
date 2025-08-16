@@ -31,4 +31,13 @@ export class UsersService {
       throw error;
     }
   }
+
+  async bumpTokenVersion(userId: string): Promise<number> {
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: { tokenVersion: { increment: 1 } },
+      select: { tokenVersion: true },
+    });
+    return updated.tokenVersion;
+  }
 }

@@ -4,4 +4,8 @@ export interface User {
   password: string;
   createdAt: Date;
   updatedAt: Date;
+  tokenVersion: number;
 }
+
+
+export type UserLogin = Pick<User, 'email' | 'password'>
