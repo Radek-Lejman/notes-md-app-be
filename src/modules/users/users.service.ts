@@ -1,7 +1,6 @@
 import { ConflictException, Injectable, Logger } from '@nestjs/common';
-import { User } from '@prisma/client';
 import { PrismaService } from 'src/services/prisma.service';
-import { UserLogin } from './interfaces/user.interface';
+import { UserLogin, User } from './interfaces/user.interface';
 import { isUniqueField } from 'src/common/prisma/prisma-errror';
 
 @Injectable()
@@ -12,6 +11,11 @@ export class UsersService {
   public findByEmail(email: string): Promise<User | null> {
     return this.prisma.user.findUnique({
       where: { email },
+    });
+  }
+  public findById(id: string): Promise<User | null> {
+    return this.prisma.user.findUnique({
+      where: { id },
     });
   }
 
