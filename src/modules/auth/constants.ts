@@ -5,10 +5,10 @@ export const refreshTokenExpireIn = envNumber('JWT_REFRESH_EXPIRE_IN', 7);
 
 export const jwtAccessTokenConstant = {
   secret: envString('JWT_ACCESS_SECRET', 'default-access-secret'),
-  expire_in: accessTokenExpireIn,
+  expire_in: `${accessTokenExpireIn}m`,
 };
 
 export const jwtRefreshTokenConstants = {
   secret: envString('JWT_REFRESH_SECRET', 'default-refresh-secret'),
-  expire_in: refreshTokenExpireIn,
+  expire_in: `${refreshTokenExpireIn}d`,
 };
