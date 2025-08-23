@@ -8,9 +8,10 @@ import { ConfigModule } from '@nestjs/config';
 import { JwtInnerService } from './services/jwt.service';
 import accessTokenConfig from './config/jwt.config';
 import refreshJwtConfig from './config/refreshJwt.config';
+import { CsrfController } from './controllers/csrf.controller';
 
 @Module({
-  controllers: [AuthController],
+  controllers: [AuthController, CsrfController],
   imports: [
     UsersModule,
     JwtModule.register({ global: true }),
