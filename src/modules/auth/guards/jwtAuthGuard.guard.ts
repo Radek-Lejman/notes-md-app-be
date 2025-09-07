@@ -22,7 +22,7 @@ export class JwtAuthGuard implements CanActivate {
       req['user'] = payload;
     } catch (e: unknown) {
       this.logger.error('Token authentication failed', { e });
-      throw new UnauthorizedException(e);
+      throw new UnauthorizedException('Invalid token');
     }
     this.logger.log('Token authentication success');
 
