@@ -4,6 +4,8 @@ import { AppService } from './app.service';
 import { PrismaService } from './services/prisma.service';
 import { AuthModule } from './modules/auth/auth.module';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { throttleGLobalConfig } from './common/utils/throttle.config';
 
 @Module({
   imports: [
@@ -12,6 +14,7 @@ import { ConfigModule } from '@nestjs/config';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    ThrottlerModule.forRoot([throttleGLobalConfig]),
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],
