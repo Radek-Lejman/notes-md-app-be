@@ -1,11 +1,11 @@
 import * as csurf from 'csurf';
-import { Environment } from './env.enum';
+import { isProd } from 'src/common/utils/env';
 
 export const csrfMiddleware = csurf({
   cookie: {
     key: 'XSRF-TOKEN',
     httpOnly: true,
-    sameSite: process.env.NODE_ENV === Environment.Production ? 'strict' : 'lax',
-    secure: process.env.NODE_ENV === Environment.Production,
+    sameSite: isProd ? 'strict' : 'lax',
+    secure: isProd,
   },
 });
