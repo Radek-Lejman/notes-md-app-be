@@ -12,20 +12,20 @@ export class ThrottlerExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
-    const ttl = request.originalUrl.startsWith('/auth')
+    const ttlMs = request.originalUrl.startsWith('/auth')
       ? throttleAuthConfig.ttl
       : throttleGLobalConfig.ttl;
 
+    const retryAfterSeconds = Math.ceil(ttlMs / 1000);
     this.logger.warn(
-      `Rate limit exceeded for ${request.ip} on ${request.method} ${request.originalUrl} (Retry-After: ${ttl}s)`,
+      `Rate limit exceeded for ${request.ip} on ${request.method} ${request.originalUrl} (Retry-After: ${ttlMs}s)`,
     );
 
-    response.setHeader('Retry-After', ttl);
-
+    response.setHeader('Retry-After', retryAfterSeconds.toString());
     response.status(429).json({
       statusCode: 429,
       error: 'Too Many Requests',
-      message: `Rate limit exceeded. Please try again in ${ttl} seconds.`,
+      message: `Rate limit exceeded. Please try again in ${retryAfterSeconds} seconds.`,
     });
   }
 }

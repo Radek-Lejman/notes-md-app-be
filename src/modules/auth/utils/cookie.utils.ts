@@ -5,13 +5,13 @@ import { accessTokenExpireIn, refreshTokenExpireIn } from '../constants';
 import { isProd } from 'src/common/utils/env';
 
 export function setAuthCookies(res: Response, accessToken?: string, refreshToken?: string): void {
-  const accessMaxAge = accessToken ? minutesToSeconds(+accessTokenExpireIn) : 0;
-  const refreshMaxAge = refreshToken ? daysToSeconds(+refreshTokenExpireIn) : 0;
+  const accessMaxAge = accessToken ? minutesToSeconds(Number(accessTokenExpireIn)) : 0;
+  const refreshMaxAge = refreshToken ? daysToSeconds(Number(refreshTokenExpireIn)) : 0;
 
   const common = {
     httpOnly: true,
     secure: isProd,
-    sameSite: 'lax' as const,
+    sameSite: isProd ? ('strict' as const) : ('lax' as const),
     path: '/',
   };
 

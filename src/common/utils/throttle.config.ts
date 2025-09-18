@@ -1,8 +1,8 @@
 export const throttleGLobalConfig = {
-  ttl: 60,
-  limit: 100,
+  ttl: 60_000,
+  limit: 10,
 };
 export const throttleAuthConfig = {
-  ttl: 60,
+  ttl: 60_000,
   limit: 6,
 };
