@@ -9,6 +9,7 @@ import { JwtInnerService } from './services/jwt.service';
 import accessTokenConfig from './config/jwt.config';
 import refreshJwtConfig from './config/refreshJwt.config';
 import { CsrfController } from './controllers/csrf.controller';
+import { BruteForceService } from 'src/services/bruteForceService';
 
 @Module({
   controllers: [AuthController, CsrfController],
@@ -18,7 +19,7 @@ import { CsrfController } from './controllers/csrf.controller';
     ConfigModule.forFeature(accessTokenConfig),
     ConfigModule.forFeature(refreshJwtConfig),
   ],
-  providers: [AuthService, PrismaService, JwtService, JwtInnerService],
+  providers: [AuthService, BruteForceService, PrismaService, JwtService, JwtInnerService],
   exports: [JwtInnerService],
 })
 export class AuthModule {}

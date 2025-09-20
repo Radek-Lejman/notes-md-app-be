@@ -5,3 +5,8 @@ declare module 'express-serve-static-core' {
     csrfToken: () => string;
   }
 }
+declare module 'express-serve-static-core' {
+  interface Request {
+    __bfKeys?: string[];
+  }
+}
