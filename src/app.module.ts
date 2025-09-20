@@ -5,7 +5,7 @@ import { PrismaService } from './services/prisma.service';
 import { AuthModule } from './modules/auth/auth.module';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { throttleGLobalConfig, throttleAuthConfig } from './common/utils/throttle.config';
+import { throttleGLobalConfig, throttleAuthConfig } from './config/throttle.config';
 import { APP_GUARD } from '@nestjs/core';
 
 @Module({

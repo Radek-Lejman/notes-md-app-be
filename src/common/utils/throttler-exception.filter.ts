@@ -1,7 +1,7 @@
 import { ExceptionFilter, Catch, ArgumentsHost, Logger } from '@nestjs/common';
 import { ThrottlerException } from '@nestjs/throttler';
 import { Response, Request } from 'express';
-import { throttleAuthConfig, throttleGLobalConfig } from '../utils/throttle.config';
+import { throttleAuthConfig, throttleGLobalConfig } from '../../config/throttle.config';
 
 @Catch(ThrottlerException)
 export class ThrottlerExceptionFilter implements ExceptionFilter {
