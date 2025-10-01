@@ -31,9 +31,6 @@ export class RefreshTokenService {
         expiresAt,
       },
     });
-    const createdRefToken = await this.prisma.refreshToken.findFirst({ where: { jti: jti } });
-
-    this.logger.log(createdRefToken);
 
     const refreshPayload: RefreshTokenPayload = {
       sub: user.id,
