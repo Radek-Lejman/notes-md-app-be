@@ -5,11 +5,12 @@ import { PrismaService } from 'src/services/prisma.service';
 import { UsersModule } from '../users/users.module';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { ConfigModule } from '@nestjs/config';
-import { JwtInnerService } from './services/jwt.service';
+import { AccessTokenService } from './services/accessToken.service';
 import accessTokenConfig from './config/jwt.config';
 import refreshJwtConfig from './config/refreshJwt.config';
 import { CsrfController } from './controllers/csrf.controller';
 import { BruteForceService } from 'src/services/bruteForceService';
+import { RefreshTokenService } from './services/refreshToken.serivce';
 
 @Module({
   controllers: [AuthController, CsrfController],
@@ -19,7 +20,14 @@ import { BruteForceService } from 'src/services/bruteForceService';
     ConfigModule.forFeature(accessTokenConfig),
     ConfigModule.forFeature(refreshJwtConfig),
   ],
-  providers: [AuthService, BruteForceService, PrismaService, JwtService, JwtInnerService],
-  exports: [JwtInnerService],
+  providers: [
+    RefreshTokenService,
+    AuthService,
+    BruteForceService,
+    PrismaService,
+    JwtService,
+    AccessTokenService,
+  ],
+  exports: [AccessTokenService],
 })
 export class AuthModule {}

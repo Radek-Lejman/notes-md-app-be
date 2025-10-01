@@ -6,13 +6,13 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { JwtInnerService } from '../services/jwt.service';
+import { AccessTokenService } from '../services/accessToken.service';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   private readonly logger = new Logger(JwtAuthGuard.name);
 
-  constructor(private readonly jwtService: JwtInnerService) {}
+  constructor(private readonly jwtService: AccessTokenService) {}
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest<Request>();
     const token = req.cookies?.access_token;

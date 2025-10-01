@@ -1,9 +1,11 @@
-export interface JwtPayload {
+export interface AccessTokenPayload {
   sub: string;
   email: string;
   iat?: number;
   exp?: number;
 }
-export type RefreshPayload = JwtPayload & {
+
+export type RefreshTokenPayload = AccessTokenPayload & {
   tokenVersion: number;
+  jti: string;
 };
