@@ -1,9 +1,11 @@
 import { CanActivate, ExecutionContext, Injectable, HttpException, Logger } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { BruteForceService } from 'src/services/bruteForceService';
+import { TooManyRequestsException } from '../exceptions/too-many-requests.exception';
 
 @Injectable()
 export class BruteForceGuard implements CanActivate {
+  logger = new Logger(BruteForceGuard.name);
   constructor(private readonly bf: BruteForceService) {}
 
   canActivate(ctx: ExecutionContext): boolean {
@@ -20,9 +22,11 @@ export class BruteForceGuard implements CanActivate {
     const locked = this.bf.firstLocked(keys);
     if (locked) {
       const retry = this.bf.getRetryAfterSeconds(locked);
+      this.logger.warn(`Brute force lock for keys: ${keys.join(', ')}, retry after ${retry}s`);
+
       res.setHeader('Retry-After', retry.toString());
 
-      throw new HttpException('Too many failed attempts. Try again later.', 429);
+      throw new TooManyRequestsException(retry);
     }
     return true;
   }
