@@ -7,6 +7,7 @@ import { RefreshTokenPayload } from '../interfaces/jwt.interface';
 import refreshJwtConfig from '../config/refreshJwt.config';
 import { ConfigType } from '@nestjs/config';
 import { JwtService as JwtNestService } from '@nestjs/jwt';
+import { calculateExpiresAt } from '../utils/expiresIn';
 
 @Injectable()
 export class RefreshTokenService {
@@ -22,7 +23,7 @@ export class RefreshTokenService {
 
   async createToken(user: User) {
     const jti = randomUUID();
-    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 14); // 14 days
+    const expiresAt = calculateExpiresAt(this.refreshConfig.expiresIn);
 
     await this.prisma.refreshToken.create({
       data: {

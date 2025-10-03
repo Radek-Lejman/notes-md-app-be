@@ -9,3 +9,6 @@ export type RefreshTokenPayload = AccessTokenPayload & {
   tokenVersion: number;
   jti: string;
 };
+
+export type DaysJwtConfigString = `${number}d`;
+export type MinutesJwtConfigString = `${number}m`;
