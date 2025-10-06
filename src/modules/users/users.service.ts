@@ -1,7 +1,7 @@
 import { ConflictException, Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from 'src/services/prisma.service';
+import { PrismaService } from 'src/infrastructure/database/prisma/prisma.service';
 import { UserLogin, User } from './interfaces/user.interface';
-import { isUniqueField } from 'src/common/prisma/prisma-errror';
+import { isUniqueField } from 'src/infrastructure/database/prisma/prisma-errror.util';
 
 @Injectable()
 export class UsersService {

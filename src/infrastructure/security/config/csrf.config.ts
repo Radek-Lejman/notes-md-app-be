@@ -1,5 +1,5 @@
-import * as csurf from 'csurf';
-import { isProd } from 'src/common/utils/env';
+import csurf from 'csurf';
+import { isProd } from 'src/core/config/env';
 
 export const csrfMiddleware = csurf({
   cookie: {

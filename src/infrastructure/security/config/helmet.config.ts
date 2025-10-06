@@ -1,5 +1,6 @@
 import helmet from 'helmet';
-import { isProd } from 'src/common/utils/env';
+import { isProd } from 'src/core/config/env';
+import ms from 'ms';
 
 export const helmetConfig = () => {
   return helmet({
@@ -19,9 +20,12 @@ export const helmetConfig = () => {
   });
 };
 
+// TODO - move to time filder
+const seconds = (time: string) => Math.floor(ms(time) / 1000);
+
 export const hstsConfig = () =>
   helmet.hsts({
-    maxAge: 604800, // 1 week
+    maxAge: seconds('7d'),
     includeSubDomains: true,
     preload: true,
   });

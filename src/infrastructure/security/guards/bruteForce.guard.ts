@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable, HttpException, Logger } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { BruteForceService } from 'src/services/bruteForceService';
-import { TooManyRequestsException } from '../exceptions/too-many-requests.exception';
+import { TooManyRequestsException } from 'src/infrastructure/security/exceptions/too-many-requests.exception';
+import { BruteForceService } from 'src/infrastructure/security/services/bruteForceService';
 
 @Injectable()
 export class BruteForceGuard implements CanActivate {

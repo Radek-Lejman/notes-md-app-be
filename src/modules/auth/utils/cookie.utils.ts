@@ -2,7 +2,7 @@ import { Response } from 'express';
 import { serialize } from 'cookie';
 import { daysToSeconds, minutesToSeconds } from 'src/common/utils/time';
 import { accessTokenExpireIn, refreshTokenExpireIn } from '../constants';
-import { isProd } from 'src/common/utils/env';
+import { isProd } from 'src/core/config/env';
 
 export function setAuthCookies(res: Response, accessToken?: string, refreshToken?: string): void {
   const accessMaxAge = accessToken ? minutesToSeconds(Number(accessTokenExpireIn)) : 0;

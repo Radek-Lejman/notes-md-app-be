@@ -1,6 +1,6 @@
 import { ArgumentsHost, Catch, ExceptionFilter } from '@nestjs/common';
 import { Response } from 'express';
-import { TooManyRequestsException } from '../exceptions/too-many-requests.exception';
+import { TooManyRequestsException } from 'src/infrastructure/security/exceptions/too-many-requests.exception';
 
 @Catch(TooManyRequestsException)
 export class BruteForceExceptionFilter implements ExceptionFilter {

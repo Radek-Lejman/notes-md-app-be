@@ -1,7 +1,7 @@
 import { ExceptionFilter, Catch, ArgumentsHost, Logger } from '@nestjs/common';
 import { ThrottlerException } from '@nestjs/throttler';
 import { Response, Request } from 'express';
-import { throttleAuthConfig, throttleGLobalConfig } from '../../config/throttle.config';
+import { throttleAuthConfig, throttleGlobalConfig } from '../config/throttle.config';
 
 @Catch(ThrottlerException)
 export class ThrottlerExceptionFilter implements ExceptionFilter {
@@ -14,7 +14,7 @@ export class ThrottlerExceptionFilter implements ExceptionFilter {
 
     const ttlMs = request.originalUrl.startsWith('/auth')
       ? throttleAuthConfig.ttl
-      : throttleGLobalConfig.ttl;
+      : throttleGlobalConfig.ttl;
 
     const retryAfterSeconds = Math.ceil(ttlMs / 1000);
     this.logger.warn(

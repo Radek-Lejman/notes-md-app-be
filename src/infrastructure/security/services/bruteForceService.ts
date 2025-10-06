@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { BruteForceEntry } from 'src/common/types/bruteForce.types';
-import { bruteForceConfig } from 'src/config/bruteForce.config';
+import { BruteForceEntry } from 'src/infrastructure/security/types/bruteForce.types';
+import { bruteForceConfig } from 'src/infrastructure/security/config/bruteForce.config';
 
 @Injectable()
 export class BruteForceService {
