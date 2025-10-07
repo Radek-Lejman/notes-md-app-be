@@ -1,8 +1,9 @@
 import { Response } from 'express';
 import { serialize } from 'cookie';
-import { daysToSeconds, minutesToSeconds } from 'src/common/utils/time';
-import { accessTokenExpireIn, refreshTokenExpireIn } from '../constants';
 import { isProd } from 'src/core/config/env';
+import { accessTokenExpireIn } from '../config/jwt.config';
+import { refreshTokenExpireIn } from '../config/refreshJwt.config';
+import { daysToSeconds, minutesToSeconds } from '@common/utils';
 
 export function setAuthCookies(res: Response, accessToken?: string, refreshToken?: string): void {
   const accessMaxAge = accessToken ? minutesToSeconds(Number(accessTokenExpireIn)) : 0;

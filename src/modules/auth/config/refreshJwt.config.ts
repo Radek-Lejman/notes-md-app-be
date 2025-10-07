@@ -1,6 +1,6 @@
 import { registerAs } from '@nestjs/config';
-import { envNumber, envSecret } from 'src/core/config/env';
 import { DaysJwtConfigString } from '../interfaces/jwt.interface';
+import { envNumber, envSecret } from '@core/config';
 
 export const refreshTokenExpireIn = envNumber('JWT_REFRESH_EXPIRE_IN', {
   default: 7,

@@ -1,6 +1,6 @@
 import { registerAs } from '@nestjs/config';
-import { envNumber, envSecret } from 'src/core/config/env';
 import { MinutesJwtConfigString } from '../interfaces/jwt.interface';
+import { envNumber, envSecret } from '@core/config';
 
 export const accessTokenExpireIn = envNumber('JWT_ACCESS_EXPIRE_IN', {
   default: 15,
