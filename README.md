@@ -1,98 +1,198 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Security Overview
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+This project ships with a layered “Security” setup designed as a dedicated module plus a cohesive set of configurations. Below is a README-ready overview of what’s enabled, why, and how it works.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## What’s Included
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- **HTTP hardening:** CORS, CSRF (double-submit cookie), Helmet (CSP, HSTS, Frameguard, noSniff, CORP/COEP).
+- **Rate limiting:** global and `/auth`-scoped throttling, with a custom exception filter that sets `Retry-After`.
+- **Brute-force protection:** guard + in-memory counter keyed by IP and email, time-windowed attempts and temporary locks, consistent `429` JSON.
+- **Authentication:**
+  - Access token (JWT) — short-lived, stored in an `httpOnly` cookie.
+  - Refresh token — rotated and tracked in DB (Prisma) with `jti`, `expiresAt`, and `revoked`, with reuse detection.
+- **Configuration:** everything registered via `@nestjs/config`, times expressed in human-friendly strings (via `ms`), prod/dev behavior toggled by `isProd`.
 
-## Project setup
+---
 
-```bash
-$ npm install
+## Middleware & Headers
+
+### CORS
+
+- origin: `'http://localhost:5173'`
+- credentials: `true`
+- Methods: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`
+- Allowed headers: `Content-Type`, `Authorization`, `X-XSRF-TOKEN`
+
+This allows the SPA (Vite/React) to send credentialed requests (cookies) safely.
+
+### CSRF (`csurf`)
+
+- Double-submit cookie pattern:
+  - Backend sets an `httpOnly` cookie `XSRF-TOKEN`.
+  - Client echoes that value in the `X-XSRF-TOKEN` header for state-changing requests.
+- Cookie flags: `sameSite: 'strict'` and `secure: true` in production.
+
+### Helmet
+
+- CSP with secure defaults (restrictive `default-src`, `script-src`, and explicit `connect-src` to local dev host).
+- `frameguard: 'deny'`, `noSniff`, `dnsPrefetchControl: off`, `CORP = same-origin`.
+- COEP tightened in production: `crossOriginEmbedderPolicy: 'require-corp'` (or disabled in dev).
+- HSTS with a 7-day `maxAge`, `includeSubDomains`, and `preload`.
+
+`maxAge` is derived using `ms('7d') → seconds`, to keep config human-readable.
+
+---
+
+## Rate Limiting
+
+### Throttling Profiles
+
+- **Global:** 1m / 40 requests.
+- **Auth (/auth):** 1m / 25 requests.
+
+### ThrottlerExceptionFilter
+
+- Automatically chooses the correct TTL (global vs `/auth`) by inspecting the request URL.
+- Sets the `Retry-After` header (in seconds).
+- Returns a consistent JSON:
+
+```json
+{
+  "statusCode": 429,
+  "error": "Too Many Requests",
+  "message": "Rate limit exceeded. Please try again in N seconds."
+}
 ```
 
-## Compile and run the project
+# Brute-force Protection (login)
 
-```bash
-# development
-$ npm run start
+## BruteForceService (in-memory)
 
-# watch mode
-$ npm run start:dev
+- Keys: `ip:<addr>` and `acct:<email>`.
+- Defaults:
+  - Window: 30s
+  - Max attempts: 20
+  - Lock: 2m
+- Resets counters after a successful login; increments after a failed one.
+- In production, consider a persistent store (e.g., Redis).
 
-# production mode
-$ npm run start:prod
-```
+## BruteForceGuard (applied to /auth/login)
 
-## Run tests
+- Builds keys (ip, email), stores them on `req.__bfKeys`.
+- If locked: logs a warning, sets `Retry-After`, and throws `TooManyRequestsException(retryAfter)`.
 
-```bash
-# unit tests
-$ npm run test
+## BruteForceExceptionFilter
 
-# e2e tests
-$ npm run test:e2e
+- Catches `TooManyRequestsException`, sets `Retry-After`, returns a uniform `429` JSON with a `retryAfter` field.
 
-# test coverage
-$ npm run test:cov
-```
+---
 
-## Deployment
+# Authentication & Sessions
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+## Access Token (JWT)
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+- Issued by `AccessTokenService` using the JWT config (`secret`, `expiresIn`, e.g., `15m`).
+- Stored in an `httpOnly` cookie: `access_token` (with `sameSite` and `secure` toggled by `isProd`).
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
+## JwtAuthGuard
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+- Reads token from cookie, verifies it, and attaches the payload to `req.user`.
+- On failure: throws `401 Unauthorized`.
 
-## Resources
+## Refresh Token (rotated with reuse detection)
 
-Check out a few resources that may come in handy when working with NestJS:
+- Issued by `RefreshTokenService`:
+  - Generates a `jti`.
+  - Computes `expiresAt` from `refresh-jwt.expiresIn` (e.g., `'7d'` → `Date` via `ms`-based helper).
+  - Persists a `RefreshToken` record (Prisma).
+  - Signs a refresh JWT with payload: `sub`, `email`, `jti`, `tokenVersion`.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### Rotation flow (`POST /auth/refresh`)
 
-## Support
+1. Verify refresh JWT (`secret`, `exp`).
+2. Lookup by `jti` in DB:
+   - No record or `revoked = true` ⇒ reuse detected → 401.
+   - `expiresAt` in the past ⇒ expired → 401.
+3. Revoke old record (`revoked = true`).
+4. Issue: new DB record + new refresh JWT + new access JWT.
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## Revoke All Sessions
 
-## Stay in touch
+- `updateMany` (by userId) setting `revoked = true` to force-logout from all devices.
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+## Cookies (`setAuthCookies`)
 
-## License
+- Helper sets `access_token` and `refresh_token` cookies with `httpOnly`, `sameSite`, `secure` (prod), and correct `maxAge`.
+- Durations are derived from typed config values (`"15m"`, `"7d"`) → seconds.
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+---
+
+# Configuration & Time Handling
+
+- All configs are registered via `@nestjs/config` (`registerAs`) and consumed with proper typing:
+  - `jwt (access): { secret, expiresIn: "15m" }`
+  - `refresh-jwt: { secret, expiresIn: "7d" }`
+  - `bruteForce: { windowMs: ms("30s"), maxAttempts: 20, lockMs: ms("2m") }`
+- `ms` library standardizes durations across the app (`"30s"` | `"2m"` | `"7d"` → milliseconds).
+- `isProd` toggles stricter security (cookies, headers, COEP/COEP).
+
+---
+
+# Module Structure (high level)
+
+- `infrastructure/security`
+  - Config: `cors.config.ts`, `csrf.config.ts`, `helmet.config.ts`, `throttle.config.ts`, `bruteForce.config.ts`
+  - Guards & Filters: `BruteForceGuard`, `BruteForceExceptionFilter`, `ThrottlerExceptionFilter`
+  - Services: `BruteForceService`
+  - Module: `SecurityModule` (registers configs and global filters)
+- `modules/auth`
+  - Config: `jwt.config.ts`, `refreshJwt.config.ts`
+  - Services: `AccessTokenService`, `RefreshTokenService`
+  - Guards: `JwtAuthGuard`
+  - Utils: `cookie.util.ts`, `expiresIn.ts` (computes `expiresAt`)
+  - DB: Prisma model `RefreshToken` (with `jti`, `revoked`, `expiresAt`)
+
+---
+
+# Quick Test Scenarios
+
+1. **Brute-force lock**
+   - Send 20 invalid `/auth/login` attempts within 30 s.
+   - Expect `429` with `Retry-After` header and JSON body containing `retryAfter`.
+2. **Global rate limit**
+   - Send 40 requests to any non-auth route within 60 s.
+   - Expect `429` with consistent JSON and `Retry-After`.
+3. **Refresh rotation**
+   - Login → get refresh A1.
+   - Call `/auth/refresh` → get A2 (new refresh), and DB shows A1 `revoked = true`.
+4. **Reuse detection**
+   - After rotation, call `/auth/refresh` again using A1.
+   - Expect `401` with message like `"Refresh token reuse detected"`.
+5. **Revoke all**
+   - Call the “revoke all” endpoint (force logout).
+   - Expect all user’s refresh token records set to `revoked = true`.
+
+---
+
+# Why This Matters
+
+- Defense in depth: headers + CORS/CSRF + throttling + brute-force + secure cookies + refresh rotation.
+- Session safety: `httpOnly` cookies, short-lived access JWT, rotated refresh with reuse detection.
+- Consistent errors: custom exception filters set `Retry-After` and return uniform JSON responses.
+- Clean configuration: secrets and durations centralized and typed; easy to tune.
+
+---
+
+# Tuning Knobs
+
+- Durations & limits (single source of truth):
+  - `jwt.expiresIn`, `refresh-jwt.expiresIn`
+  - `bruteForce.windowMs`, `bruteForce.maxAttempts`, `bruteForce.lockMs`
+  - `throttle.*.ttl`, `throttle.*.limit`
+  - `hsts.maxAge` (e.g., `ms('7d')`)
+- Cookies: `secure`, `sameSite` based on `isProd`.
+- CSP/COEP: tighten allow-lists and cross-origin policies for production as needed.
+
+---
