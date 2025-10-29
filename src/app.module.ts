@@ -9,10 +9,15 @@ import {
   throttleAuthConfig,
 } from './infrastructure/security/config/throttle.config';
 import { APP_GUARD } from '@nestjs/core';
+import { PrismaModule } from './infrastructure/database/prisma/prisma.module';
+import { NotesModule } from './modules/notes/notes.module';
+import { JwtAuthGuard } from './modules/auth/guards/jwtAuthGuard.guard';
 
 @Module({
   imports: [
     AuthModule,
+    NotesModule,
+    PrismaModule,
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
@@ -23,6 +28,10 @@ import { APP_GUARD } from '@nestjs/core';
     ]),
   ],
   controllers: [AppController],
-  providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [
+    AppService,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+  ],
 })
 export class AppModule {}
