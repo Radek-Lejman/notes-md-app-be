@@ -1,15 +1,4 @@
 services:
-  backend:
-    build: ./
-    ports:
-      - "3000:3000"
-    env_file:
-      - .env
-    depends_on:
-      db:
-        condition: service_healthy
-    volumes:
-      - ./:/app
   db:
     image: postgres:15
     restart: always
@@ -30,6 +19,34 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
-
+  migrator:
+    image: notes-app-be-backend:latest
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    command: >
+      sh -lc "
+        echo '⏳ Waiting for DB...';
+        node -e 'require(\"net\").connect(5432, \"db\").on(\"connect\",()=>process.exit(0)).on(\"error\",()=>process.exit(1))' || exit 1;
+        npx prisma generate &&
+        npx prisma migrate deploy &&
+        echo '✅ Prisma ready'
+      "
+    restart: "no"
+  backend:
+    build: ./
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
+    volumes:
+      - ./:/app
 volumes:
   postgres_data:
