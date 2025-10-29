@@ -1,5 +1,4 @@
 import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
-import { PrismaService } from 'src/infrastructure/database/prisma/prisma.service';
 import { randomUUID } from 'crypto';
 import { User } from '@prisma/client';
 import { UsersService } from 'src/modules/users/users.service';
@@ -8,6 +7,7 @@ import refreshJwtConfig from '../config/refreshJwt.config';
 import { ConfigType } from '@nestjs/config';
 import { JwtService as JwtNestService } from '@nestjs/jwt';
 import { calculateExpiresAt } from '../utils/expiresIn';
+import { PrismaService } from '@database/prisma';
 
 @Injectable()
 export class RefreshTokenService {
