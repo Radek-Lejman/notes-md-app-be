@@ -19,12 +19,14 @@
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
     "paths": {
-      "@security": ["src/infrastructure/security/index.ts"],
+      "@security": ["src/infrastructure/security"],
       "@security/*": ["src/infrastructure/security/*"],
       "@core": ["src/core/index.ts"],
       "@core/*": ["src/core/*"],
       "@common": ["src/common/index.ts"],
-      "@common/*": ["src/common/*"]
+      "@common/*": ["src/common/*"],
+      "@database": ["rc/infrastructure/database"],
+      "@database/*": ["src/infrastructure/database/*"]
     }
   }
 }
