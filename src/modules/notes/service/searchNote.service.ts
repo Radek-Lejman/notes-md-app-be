@@ -1,13 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { TreeService } from '@core/tree/tree.service';
-import { fromStringToArray } from '@core/utils';
+import { createPerKeyLimiter, fromStringToArray } from '@core/utils';
 import { createFieldSelector } from '@core/selector/utils';
 import { FieldSelector } from '@core/selector/types';
 import { buildOrderBy } from '@core/sort';
 import { NotesService } from './notes.service';
 import { Note, NoteWithFamily } from '../interfaces/notes.interface';
 import { GetNoteQueryDto } from '../dto/get-note.query.dto';
-import { DEFAULT_CHILDREN_SORT_FIELD } from '../consts/notes.consts';
+import { DEFAULT_CHILDREN_LIMIT, DEFAULT_CHILDREN_SORT_FIELD } from '../consts/notes.consts';
 import { AdapterTreeNotes } from '../utils/notesToTree';
 import { clampDepth } from '../utils/note.utils';
 import { NotesSortInput } from '../interfaces/notesQuery.interface';
@@ -64,6 +64,7 @@ export class SearchNotesService {
     const mainParentId = notesTree.getRoot().id;
 
     this.searchedNoteses = [mainParentId];
+    const childLimiter = createPerKeyLimiter(this.getChidrenLimit);
 
     for (let level = 0; level < this.depthParam; level++) {
       if (this.searchedNoteses.length === 0) continue;
@@ -83,21 +84,24 @@ export class SearchNotesService {
       }
 
       this.searchedNoteses = [];
-      notesesInCurrentDepth.forEach((childNode) => {
-        if (childNode) {
-          const treeChild = AdapterTreeNotes.toTree(childNode);
-          if (treeChild.parentId === null) {
-            this.logger.warn(`Child note ${treeChild.id} missing parent reference`);
-            return;
-          }
-          notesTree.addChild(
-            treeChild.parentId,
-            { ...treeChild.data, id: treeChild.id },
-            treeChild.id,
-          );
-          this.searchedNoteses.push(treeChild.id);
+      for (const childNode of notesesInCurrentDepth) {
+        if (!childNode) continue;
+
+        if (!childLimiter.allow(childNode.parentId)) {
+          continue;
         }
-      });
+        const treeChild = AdapterTreeNotes.toTree(childNode);
+        if (treeChild.parentId === null) {
+          this.logger.warn(`Child note ${treeChild.id} missing parent reference`);
+          continue;
+        }
+        notesTree.addChild(
+          treeChild.parentId,
+          { ...treeChild.data, id: treeChild.id },
+          treeChild.id,
+        );
+        this.searchedNoteses.push(treeChild.id);
+      }
     }
     return notesTree;
   }
@@ -129,5 +133,9 @@ export class SearchNotesService {
       this.query?.['children.sort'] as NotesSortInput | undefined,
       DEFAULT_CHILDREN_SORT_FIELD,
     );
+  }
+
+  private get getChidrenLimit() {
+    return this.query?.['children.limit'] ?? DEFAULT_CHILDREN_LIMIT;
   }
 }
