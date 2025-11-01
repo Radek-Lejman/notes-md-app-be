@@ -1,12 +1,13 @@
 import { IsOptional, IsString, MinLength } from 'class-validator';
 import { NoteBase } from '../interfaces/notes.interface';
+import { MIN_CONTENT_LENGTH } from '../consts/validator.consts';
 
 export class CreateNoteDto implements NoteBase {
   @IsString()
-  @MinLength(2)
+  @MinLength(MIN_CONTENT_LENGTH)
   title: string;
   @IsString()
-  @MinLength(3)
+  @MinLength(MIN_CONTENT_LENGTH)
   content: string;
   @IsOptional()
   @IsString()

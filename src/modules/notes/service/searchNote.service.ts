@@ -7,7 +7,7 @@ import { buildOrderBy } from '@core/sort';
 import { NotesService } from './notes.service';
 import { Note, NoteWithFamily } from '../interfaces/notes.interface';
 import { GetNoteQueryDto } from '../dto/get-note.query.dto';
-import { DEFAULT_CHILDREN_LIMIT, DEFAULT_CHILDREN_SORT_FIELD } from '../consts/notes.consts';
+import { DEFAULT_CHILDREN_LIMIT, DEFAULT_CHILDREN_SORT_FIELD } from '../consts/validator.consts';
 import { AdapterTreeNotes } from '../utils/notesToTree';
 import { clampDepth } from '../utils/note.utils';
 import { NotesSortInput } from '../interfaces/notesQuery.interface';

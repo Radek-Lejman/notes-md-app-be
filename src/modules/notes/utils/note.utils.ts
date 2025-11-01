@@ -1,4 +1,4 @@
-import { MAX_DEPTH } from '../consts/notes.consts';
+import { MAX_DEPTH } from '../consts/validator.consts';
 
 export function clampDepth(d?: number | string): number {
   const depth = typeof d === 'string' ? Number(d) : d;
