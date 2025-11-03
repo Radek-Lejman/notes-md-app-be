@@ -4,5 +4,4 @@ export * from './filters/throttler-exception.filter';
 export * from './guards/bruteForce.guard';
 export * from './services/bruteForceService';
 export * from './security.module';
-export * from './decorators';
 export * from './types';

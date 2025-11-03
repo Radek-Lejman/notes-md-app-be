@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { TreeService } from '@core/tree/tree.service';
 import { createPerKeyLimiter, fromStringToArray } from '@core/utils';
-import { createFieldSelector } from '@core/selector/utils';
+import { buildFieldSelector } from '@core/selector/utils';
 import { FieldSelector } from '@core/selector/types';
 import { buildOrderBy } from '@core/sort';
 import { NotesService } from './notes.service';
@@ -113,7 +113,7 @@ export class SearchNotesService {
     if (!rootChildrenFields) {
       return null;
     }
-    return createFieldSelector(rootChildrenFields);
+    return buildFieldSelector(rootChildrenFields);
   }
 
   private get depthParam(): number {
@@ -125,7 +125,7 @@ export class SearchNotesService {
     if (!rootNotesFields) {
       return null;
     }
-    return createFieldSelector(rootNotesFields);
+    return buildFieldSelector(rootNotesFields);
   }
 
   private get orderByParam() {

@@ -1,4 +1,4 @@
-import { ToInt } from '@core/transformers';
+import { ToInt } from '@common/transformers';
 import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import {
   DEFAULT_CHILDREN_LIMIT,

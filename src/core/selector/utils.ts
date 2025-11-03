@@ -1,21 +1,14 @@
 import { FieldSelector } from './types';
 
-export function createFieldSelector<T extends Record<string, true>, K extends keyof T>(
-  fields: readonly K[],
-): FieldSelector<T> {
+export function buildFieldSelector<
+  TSelectShape extends Record<string, true>,
+  K extends keyof TSelectShape,
+>(fields: readonly K[]): FieldSelector<TSelectShape> {
   return fields.reduce(
     (acc, f) => {
       acc[f] = true;
       return acc;
     },
-    {} as Partial<Record<keyof T, boolean>>,
-  ) as FieldSelector<T>;
-}
-
-export function parseFields(input?: string): readonly string[] {
-  if (!input?.trim()) return [];
-  return input
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
+    {} as Partial<Record<keyof TSelectShape, boolean>>,
+  ) as FieldSelector<TSelectShape>;
 }
