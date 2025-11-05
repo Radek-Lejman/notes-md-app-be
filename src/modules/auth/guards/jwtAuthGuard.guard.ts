@@ -8,7 +8,7 @@ import {
 import { Request } from 'express';
 import { AccessTokenService } from '../services/accessToken.service';
 import { Reflector } from '@nestjs/core';
-import { ENDPOINT_IS_PUBLIC_KEY } from '@security';
+import { ENDPOINT_IS_PUBLIC_KEY } from '@common/decorators';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {

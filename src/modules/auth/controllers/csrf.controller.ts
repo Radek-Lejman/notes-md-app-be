@@ -1,5 +1,5 @@
+import { PublicEndpoint } from '@common/decorators';
 import { Controller, Get, Req } from '@nestjs/common';
-import { PublicEndpoint } from '@security';
 import { Request } from 'express';
 
 @Controller('csrf-token')

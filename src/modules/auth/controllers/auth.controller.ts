@@ -20,11 +20,14 @@ import { setAuthCookies } from '../utils/cookie.utils';
 import { Throttle } from '@nestjs/throttler';
 import { throttleAuthConfig } from '@security/config';
 import { BruteForceGuard } from '@security';
+import { PublicEndpoint } from '@common/decorators';
 
 @Controller('/auth')
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
   constructor(private readonly authService: AuthService) {}
+
+  @PublicEndpoint()
   @Post('/register')
   async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response) {
     const { accessToken, refreshToken } = await this.authService.register(dto);
@@ -35,6 +38,7 @@ export class AuthController {
   }
 
   @HttpCode(HttpStatus.OK)
+  @PublicEndpoint()
   @Post('/login')
   @UseGuards(BruteForceGuard)
   async login(
@@ -54,6 +58,7 @@ export class AuthController {
     return user;
   }
 
+  @PublicEndpoint()
   @Post('/refresh')
   @Throttle({ option: throttleAuthConfig })
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
