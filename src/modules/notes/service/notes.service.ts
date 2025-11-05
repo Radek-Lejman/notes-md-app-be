@@ -53,7 +53,7 @@ export class NotesService {
     if (!parentIds.length) return [];
     return this.prismaService.note.findMany({
       where: { parentId: { in: parentIds } },
-      select: { ...selector, parentId: true },
+      select: { ...selector, id: true, parentId: true },
       orderBy,
     });
   }

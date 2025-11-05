@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
+  NotFoundException,
   Param,
   Post,
   Put,
@@ -14,7 +15,9 @@ import { UserNotesService } from '../service/userNotes.service';
 import { Note, NoteWithFamily } from '../interfaces/notes.interface';
 import { CreateNoteDto } from '../dto/note.dto';
 import { GetNoteQueryDto } from '../dto/get-note.query.dto';
-import { AuthUser, CurrentUser } from '@security';
+import { AuthUser } from '@security';
+import { validateAndNormalizeFields } from '../utils/validateNoteFields';
+import { CurrentUser } from '@common/decorators';
 
 @Controller('/notes')
 export class NotesController {
@@ -45,7 +48,14 @@ export class NotesController {
     @Param('id') id: string,
     @Query() query: GetNoteQueryDto,
   ): Promise<NoteWithFamily | null> {
+    [query.fields, query['children.fields']].forEach((fields) =>
+      validateAndNormalizeFields(fields),
+    );
     const noteWithChildren = await this.notesService.getNoteById(id, query);
+
+    if (!noteWithChildren) {
+      throw new NotFoundException(`Note ${id} not found`);
+    }
 
     return noteWithChildren;
   }
