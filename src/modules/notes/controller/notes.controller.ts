@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -14,10 +15,11 @@ import {
 import { UserNotesService } from '../service/userNotes.service';
 import { Note, NoteWithFamily } from '../interfaces/notes.interface';
 import { CreateNoteDto } from '../dto/note.dto';
-import { GetNoteQueryDto } from '../dto/get-note.query.dto';
+import { GetNoteQueryDto } from '../dto/getNoteQuery.dto';
 import { AuthUser } from '@security';
 import { validateAndNormalizeFields } from '../utils/validateNoteFields';
 import { CurrentUser } from '@common/decorators';
+import { SearchNotesQueryDto } from '../dto/searchNotesQueryDto';
 
 @Controller('/notes')
 export class NotesController {
@@ -41,6 +43,19 @@ export class NotesController {
     this.logger.log(userNotes);
 
     return { messsage: 'Note created' };
+  }
+
+  @Get('search')
+  async search(
+    @CurrentUser() user: AuthUser,
+    @Query() query: SearchNotesQueryDto,
+  ): Promise<Note[]> {
+    [query.fields, query['children.fields']].forEach((f) => validateAndNormalizeFields(f));
+    if (!query.q?.trim()) {
+      throw new BadRequestException('Query "q" is required');
+    }
+
+    return await this.notesService.searchByText(user.sub, query);
   }
 
   @Get(':id')
