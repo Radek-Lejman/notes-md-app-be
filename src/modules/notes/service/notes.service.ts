@@ -33,10 +33,15 @@ export class NotesService {
     });
   }
 
-  public async getNoteById(id: string, selector: NoteSelector): Promise<Note | null> {
+  public async getNoteById(
+    id: string,
+    selector: NoteSelector,
+    userId: string,
+  ): Promise<Note | null> {
     return await this.prismaService.note.findUnique({
       where: {
         id,
+        userId,
       },
       select: {
         ...selector,
@@ -50,10 +55,11 @@ export class NotesService {
     parentIds: string[],
     selector: NoteSelector,
     orderBy: Prisma.NoteOrderByWithRelationInput | undefined,
+    userId: string,
   ): Promise<Note[]> {
     if (!parentIds.length) return [];
     return this.prismaService.note.findMany({
-      where: { parentId: { in: parentIds } },
+      where: { parentId: { in: parentIds }, userId },
       select: { ...selector, id: true, parentId: true },
       orderBy,
     });

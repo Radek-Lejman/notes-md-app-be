@@ -18,13 +18,17 @@ export class NotesTreeService {
 
   constructor(private readonly notesService: NotesService) {}
 
-  async getNoteWithFamily(id: string, query: GetNoteQueryDto): Promise<NoteWithFamily | null> {
+  async getNoteWithFamily(
+    id: string,
+    query: GetNoteQueryDto,
+    userId: string,
+  ): Promise<NoteWithFamily | null> {
     const rootSelector = this.buildRootNodeSelector(query);
     if (!rootSelector) {
       return null;
     }
 
-    const rootRow = await this.notesService.getNoteById(id, rootSelector);
+    const rootRow = await this.notesService.getNoteById(id, rootSelector, userId);
     if (!rootRow) {
       return null;
     }
@@ -32,14 +36,14 @@ export class NotesTreeService {
     let parentToRootNote: Note | null = null;
 
     if (query.expand === 'parent' && rootRow.parentId) {
-      const parentRow = await this.notesService.getNoteById(rootRow.parentId, rootSelector);
+      const parentRow = await this.notesService.getNoteById(rootRow.parentId, rootSelector, userId);
       if (parentRow) {
         parentToRootNote = { ...parentRow };
       }
     }
 
     const tree = TreeService.fromRoot<Note>(AdapterTreeNotes.toTree(rootRow));
-    const preparedTree = await this.loadChildrenTree(tree, query);
+    const preparedTree = await this.loadChildrenTree(tree, query, userId);
 
     const finalResult = AdapterTreeNotes.fromTree(preparedTree.getRoot());
 
@@ -49,6 +53,7 @@ export class NotesTreeService {
   private async loadChildrenTree(
     notesTree: TreeService<Note>,
     query: GetNoteQueryDto,
+    userId: string
   ): Promise<TreeService<Note>> {
     const depth = this.getDepthParam(query);
     if (depth === 0) {
@@ -76,6 +81,7 @@ export class NotesTreeService {
           searchedNotesIds,
           rootChildrenSelector,
           this.getChildrenOrderBy(query['children.sort']),
+          userId
         )) ?? [];
 
       if (!notesInCurrentDepth.length) {

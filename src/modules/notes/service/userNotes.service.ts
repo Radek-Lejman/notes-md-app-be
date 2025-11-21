@@ -25,8 +25,12 @@ export class UserNotesService {
     return this.notesService.getAllNotes(userId);
   }
 
-  public async getNoteById(id: string, query: GetNoteQueryDto): Promise<any | null> {
-    const note = await this.notesTreeService.getNoteWithFamily(id, query);
+  public async getNoteById(
+    id: string,
+    query: GetNoteQueryDto,
+    userId: string,
+  ): Promise<any | null> {
+    const note = await this.notesTreeService.getNoteWithFamily(id, query, userId);
 
     return note;
   }

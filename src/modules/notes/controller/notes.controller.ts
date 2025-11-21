@@ -28,9 +28,7 @@ export class NotesController {
 
   @Get('')
   async getAll(@CurrentUser() user: AuthUser): Promise<Note[] | null> {
-    const tokenUserData = user;
-
-    const userNotes = await this.notesService.getAllNotes(tokenUserData.sub);
+    const userNotes = await this.notesService.getAllNotes(user.sub);
     this.logger.log(userNotes);
 
     return userNotes;
@@ -61,12 +59,13 @@ export class NotesController {
   @Get(':id')
   async getNoteById(
     @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
     @Query() query: GetNoteQueryDto,
   ): Promise<NoteWithFamily | null> {
     [query.fields, query['children.fields']].forEach((fields) =>
       validateAndNormalizeFields(fields),
     );
-    const noteWithChildren = await this.notesService.getNoteById(id, query);
+    const noteWithChildren = await this.notesService.getNoteById(id, query, user.sub);
 
     if (!noteWithChildren) {
       throw new NotFoundException(`Note ${id} not found`);
