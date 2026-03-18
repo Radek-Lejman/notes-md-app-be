@@ -7,11 +7,18 @@ import { UserNotesService } from './service/userNotes.service';
 import { NotesService } from './service/notes.service';
 import { NotesTreeService } from './service/notesTree.service';
 import { NotesSearchService } from './service/notesSerach.service';
+import { NotesPgRepository } from './utils/notesPgRepository';
 
 @Module({
   controllers: [NotesController],
   imports: [UsersModule, SecurityModule, JwtModule.register({ global: true })],
-  providers: [UserNotesService, NotesService, NotesTreeService, NotesSearchService],
+  providers: [
+    UserNotesService, 
+    NotesService,
+    NotesTreeService, 
+    NotesSearchService, 
+    NotesPgRepository
+  ],
   exports: [UserNotesService],
 })
 export class NotesModule {}
