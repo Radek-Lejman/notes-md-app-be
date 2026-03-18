@@ -30,14 +30,14 @@ model NoteVersion {
   id        String    @id @default(uuid())
   note      Note      @relation(fields: [noteId], references: [id])
   noteId    String
-  content   String    @db.Text
+  content   Json
   createdAt DateTime  @default(now())
 }
 
 model Note {
   id          String         @id @default(uuid())
   title       String
-  content     String         @db.Text
+  content     Json
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 

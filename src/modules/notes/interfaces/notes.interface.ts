@@ -2,7 +2,7 @@ import { FieldSelector } from '@core/selector/types';
 
 export interface NoteBase {
   title: string;
-  content: string;
+  content: TiptapNode;
   parentId?: string | null;
 }
 
@@ -22,3 +22,13 @@ export interface NoteWithChildren {
 export type NoteWithFamily = Partial<Note> & NoteWthParent & NoteWithChildren;
 
 export type NoteSelector = FieldSelector<Note>;
+
+
+export type TiptapNode = {
+  type: string;
+  attrs?: Record<string, unknown>;
+  content?: TiptapNode[];
+  marks?: Record<string, unknown>[];
+  text?: string;
+};
+

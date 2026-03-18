@@ -3,34 +3,39 @@ import { PrismaService } from 'src/infrastructure/database/prisma/prisma.service
 import { Note, NoteBase, NoteSelector } from '../interfaces/notes.interface';
 import { Prisma } from '@prisma/client';
 import { NoteSearchOptions } from '../interfaces/NoteSearch';
+import { NoteMapper } from '../utils/note.mapper';
+import { NotesPgRepository } from '../utils/notesPgRepository';
 
 @Injectable()
 export class NotesService {
-  updateNote(note: NoteBase, noteId: string) {
-    return this.prismaService.note.update({
+  constructor(
+    private readonly notesPgRepository: NotesPgRepository,
+    private readonly prismaService: PrismaService) {}
+
+  async updateNote(note: NoteBase, noteId: string): Promise<Note> {
+    const updated = await this.prismaService.note.update({
       where: {
         id: noteId,
       },
-      data: {
-        ...note,
-      },
+      data: NoteMapper.toPersistenceUpdate(note),
     });
+    return NoteMapper.toDomain(updated);
   }
-  constructor(private readonly prismaService: PrismaService) {}
-  public createNote(note: NoteBase, userId: string): Promise<Note> {
-    return this.prismaService.note.create({
-      data: {
-        ...note,
-        userId,
-      },
+  
+  public async createNote(note: NoteBase, userId: string): Promise<Note> {
+    const created = await this.prismaService.note.create({
+      data: NoteMapper.toPersistenceCreate(note, userId),
     });
+    return NoteMapper.toDomain(created);
   }
-  public getAllNotes(userId: string): Promise<Note[]> {
-    return this.prismaService.note.findMany({
+  
+  public async getAllNotes(userId: string): Promise<Note[]> {
+    const notes = await this.prismaService.note.findMany({
       where: {
         userId,
       },
     });
+    return NoteMapper.toDomainList(notes);
   }
 
   public async getNoteById(
@@ -38,7 +43,7 @@ export class NotesService {
     selector: NoteSelector,
     userId: string,
   ): Promise<Note | null> {
-    return await this.prismaService.note.findUnique({
+    const note = await this.prismaService.note.findUnique({
       where: {
         id,
         userId,
@@ -49,6 +54,7 @@ export class NotesService {
         parentId: true,
       },
     });
+    return NoteMapper.toDomain(note) as Note | null;
   }
 
   public async getNoteByParentId(
@@ -58,11 +64,12 @@ export class NotesService {
     userId: string,
   ): Promise<Note[]> {
     if (!parentIds.length) return [];
-    return this.prismaService.note.findMany({
+    const notes = await this.prismaService.note.findMany({
       where: { parentId: { in: parentIds }, userId },
       select: { ...selector, id: true, parentId: true },
       orderBy,
     });
+    return NoteMapper.toDomainList(notes);
   }
 
   async getNoteByText(
@@ -74,10 +81,20 @@ export class NotesService {
     const { orderBy, take } = options;
     const cursorId = options.cursorId;
 
-    return await this.prismaService.note.findMany({
+    // Two-stage search pattern: retains Prisma's pagination and type-safety,
+    // while leveraging efficient PostgreSQL GIN indexes for FTS on JSONB fields.
+    const searchResults = await this.notesPgRepository.searchNotesDb(userId, q);
+
+    const matchingIds = searchResults.map((row) => row.id);
+
+    if (matchingIds.length === 0) {
+      return [];
+    }
+
+    const notes = await this.prismaService.note.findMany({
       where: {
         userId,
-        OR: [{ title: { search: q } }, { content: { search: q } }],
+        id: { in: matchingIds },
       },
       select: { ...selector, id: true },
       orderBy,
@@ -85,5 +102,6 @@ export class NotesService {
       skip: cursorId ? 1 : undefined,
       take,
     });
+    return NoteMapper.toDomainList(notes);
   }
 }
