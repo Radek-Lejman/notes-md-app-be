@@ -1,5 +1,6 @@
 import { Prisma, Note as PrismaNote } from '@prisma/client';
 import { Note, NoteBase, TiptapNode } from '../interfaces/notes.interface';
+import { UpdateNoteDto } from '../dto/note.dto';
 
 export class NoteMapper {
 
@@ -29,11 +30,23 @@ export class NoteMapper {
     };
   }
 
-  static toPersistenceUpdate(domainNote: NoteBase): Prisma.NoteUpdateInput {
-    return {
-      title: domainNote.title,
-      content: domainNote.content as Prisma.InputJsonObject,
-      ...(domainNote.parentId && { parent: { connect: { id: domainNote.parentId } } }),
-    };
+  static toPersistenceUpdate(domainNote: UpdateNoteDto): Prisma.NoteUpdateInput {
+    const updateInput: Prisma.NoteUpdateInput = {};
+
+    if (domainNote.title !== undefined) {
+      updateInput.title = domainNote.title;
+    }
+
+    if (domainNote.content !== undefined) {
+      updateInput.content = domainNote.content as Prisma.InputJsonObject;
+    }
+
+    if (domainNote.parentId !== undefined) {
+      updateInput.parent = domainNote.parentId === null 
+        ? { disconnect: true } 
+        : { connect: { id: domainNote.parentId } };
+    }
+
+    return updateInput;
   }
 }

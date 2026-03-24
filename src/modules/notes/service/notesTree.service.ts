@@ -24,9 +24,6 @@ export class NotesTreeService {
     userId: string,
   ): Promise<NoteWithFamily | null> {
     const rootSelector = this.buildRootNodeSelector(query);
-    if (!rootSelector) {
-      return null;
-    }
 
     const rootRow = await this.notesService.getNoteById(id, rootSelector, userId);
     if (!rootRow) {
@@ -61,9 +58,6 @@ export class NotesTreeService {
     }
 
     const rootChildrenSelector = this.buildRootChildrenSelector(query);
-    if (!rootChildrenSelector) {
-      return notesTree;
-    }
 
     const mainParentId = notesTree.getRoot().id;
     const childrenLimit = this.getChildrenLimit(query);
@@ -119,10 +113,10 @@ export class NotesTreeService {
 
   private buildRootNodeSelector(query: {
     fields?: string;
-  }): FieldSelector<Record<string, true>> | null {
+  }): FieldSelector<Record<string, true>> {
     const rootNotesFields = fromStringToArray(query.fields);
-    if (!rootNotesFields) {
-      return null;
+    if (!rootNotesFields || rootNotesFields.length === 0) {
+      return buildFieldSelector(['id', 'title', 'content', 'parentId', 'createdAt', 'updatedAt']);
     }
 
     return buildFieldSelector(rootNotesFields);
@@ -131,12 +125,12 @@ export class NotesTreeService {
   private buildRootChildrenSelector(query: {
     ['children.fields']?: string;
     fields?: string;
-  }): FieldSelector<Record<string, true>> | null {
+  }): FieldSelector<Record<string, true>> {
     const rootChildrenFields =
       fromStringToArray(query['children.fields']) || fromStringToArray(query.fields);
 
-    if (!rootChildrenFields) {
-      return null;
+    if (!rootChildrenFields || rootChildrenFields.length === 0) {
+      return buildFieldSelector(['id', 'title', 'content', 'parentId', 'createdAt', 'updatedAt']);
     }
 
     return buildFieldSelector(rootChildrenFields);

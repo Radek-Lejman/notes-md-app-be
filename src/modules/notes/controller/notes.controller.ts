@@ -10,11 +10,12 @@ import {
   Param,
   Post,
   Put,
+  Patch,
   Query,
 } from '@nestjs/common';
 import { UserNotesService } from '../service/userNotes.service';
 import { Note, NoteWithFamily } from '../interfaces/notes.interface';
-import { CreateNoteDto } from '../dto/note.dto';
+import { CreateNoteDto, UpdateNoteDto } from '../dto/note.dto';
 import { GetNoteQueryDto } from '../dto/getNoteQuery.dto';
 import { AuthUser } from '@security';
 import { validateAndNormalizeFields } from '../utils/validateNoteFields';
@@ -37,10 +38,7 @@ export class NotesController {
   @HttpCode(HttpStatus.OK)
   @Post('')
   async createNote(@Body() noteDto: CreateNoteDto, @CurrentUser() user: AuthUser) {
-    const userNotes = await this.notesService.createNote(noteDto, user.sub);
-    this.logger.log(userNotes);
-
-    return { messsage: 'Note created' };
+    return await this.notesService.createNote(noteDto, user.sub);
   }
 
   @Get('search')
@@ -74,13 +72,12 @@ export class NotesController {
     return noteWithChildren;
   }
 
-  @Put(':id')
+  @Patch(':id')
   async updateNoteById(
     @Param('id') id: string,
-    @Body() updateDto: CreateNoteDto,
+    @Body() updateDto: UpdateNoteDto,
+    @CurrentUser() user: AuthUser,
   ): Promise<Note | null> {
-    const noteWithChildren = await this.notesService.updateNoteById(id, updateDto);
-
-    return noteWithChildren;
+    return await this.notesService.updateNoteById(id, updateDto, user.sub);
   }
 }

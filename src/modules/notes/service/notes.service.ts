@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/infrastructure/database/prisma/prisma.service';
 import { Note, NoteBase, NoteSelector } from '../interfaces/notes.interface';
+import { UpdateNoteDto } from '../dto/note.dto';
 import { Prisma } from '@prisma/client';
 import { NoteSearchOptions } from '../interfaces/NoteSearch';
 import { NoteMapper } from '../utils/note.mapper';
@@ -12,10 +13,11 @@ export class NotesService {
     private readonly notesPgRepository: NotesPgRepository,
     private readonly prismaService: PrismaService) {}
 
-  async updateNote(note: NoteBase, noteId: string): Promise<Note> {
+  async updateNote(note: UpdateNoteDto, noteId: string, userId: string): Promise<Note> {
     const updated = await this.prismaService.note.update({
       where: {
         id: noteId,
+        userId,
       },
       data: NoteMapper.toPersistenceUpdate(note),
     });

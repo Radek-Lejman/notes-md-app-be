@@ -1,9 +1,7 @@
 import { IsObject, IsOptional, IsString, MinLength } from 'class-validator';
+import { PartialType } from '@nestjs/mapped-types';
 import { NoteBase, TiptapNode } from '../interfaces/notes.interface';
 import { MIN_CONTENT_LENGTH } from '../consts/validator.consts';
-
-
-
 
 export class CreateNoteDto implements NoteBase {
   @IsString()
@@ -15,3 +13,5 @@ export class CreateNoteDto implements NoteBase {
   @IsString()
   parentId?: string | null;
 }
+
+export class UpdateNoteDto extends PartialType(CreateNoteDto) {}

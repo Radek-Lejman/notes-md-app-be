@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { NotesService } from './notes.service';
 import { Note, NoteBase } from '../interfaces/notes.interface';
+import { UpdateNoteDto } from '../dto/note.dto';
 import { GetNoteQueryDto } from '../dto/getNoteQuery.dto';
 import { SearchNotesQueryDto } from '../dto/searchNotesQueryDto';
 import { NotesTreeService } from './notesTree.service';
@@ -14,8 +15,8 @@ export class UserNotesService {
     private readonly notesSearchService: NotesSearchService,
   ) {}
 
-  updateNoteById(id: string, note: NoteBase) {
-    return this.notesService.updateNote(note, id);
+  updateNoteById(id: string, note: UpdateNoteDto, userId: string) {
+    return this.notesService.updateNote(note, id, userId);
   }
 
   public createNote(note: NoteBase, userId: string): Promise<Note | null> {
