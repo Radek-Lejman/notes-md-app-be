@@ -16,7 +16,7 @@ import { RegisterDto } from '../dto/register.dto';
 import { LoginDto } from '../dto/login.dto';
 import { AuthService } from '../services/auth.service';
 import { JwtAuthGuard } from '../guards/jwtAuthGuard.guard';
-import { setAuthCookies } from '../utils/cookie.utils';
+import { clearAuthCookies, setAuthCookies } from '../utils/cookie.utils';
 import { Throttle } from '@nestjs/throttler';
 import { throttleAuthConfig } from '@security/config';
 import { BruteForceGuard } from '@security';
@@ -70,7 +70,7 @@ export class AuthController {
 
   @Post('/logout')
   logout(@Res({ passthrough: true }) res: Response) {
-    setAuthCookies(res, '', '');
+    clearAuthCookies(res);
 
     return { message: 'Loged out' };
   }
@@ -85,7 +85,7 @@ export class AuthController {
     }
 
     this.authService.revokeAll(user.sub);
-    setAuthCookies(res, '', '');
+    clearAuthCookies(res);
 
     return { message: 'All refresh tokens revoked, logged out' };
   }

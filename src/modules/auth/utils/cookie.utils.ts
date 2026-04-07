@@ -23,8 +23,23 @@ export function setAuthCookies(res: Response, accessToken?: string, refreshToken
 
   const refreshCookie = serialize('refresh_token', refreshToken ?? '', {
     ...common,
+    path: '/api/auth/refresh',
     maxAge: refreshMaxAge,
   });
 
+  res.setHeader('Set-Cookie', [accessCookie, refreshCookie]);
+}
+
+
+
+export function clearAuthCookies(res: Response): void {
+  const common = {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? ('strict' as const) : ('lax' as const),
+  };
+  const accessCookie = serialize('access_token', '', { ...common, path: '/', maxAge: 0 });
+  const refreshCookie = serialize('refresh_token', '', { ...common, path: '/api/auth/refresh', maxAge: 0 });
+  
   res.setHeader('Set-Cookie', [accessCookie, refreshCookie]);
 }
