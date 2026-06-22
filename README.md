@@ -1,198 +1,314 @@
-# Security Overview
+# notes-app-be
 
-This project ships with a layered “Security” setup designed as a dedicated module plus a cohesive set of configurations. Below is a README-ready overview of what’s enabled, why, and how it works.
+NestJS backend for a Notion-style notes app with unlimited-depth nested pages, full-text search across JSONB content, and stateful JWT authentication with per-token rotation and global revoke.
 
----
-
-## What’s Included
-
-- **HTTP hardening:** CORS, CSRF (double-submit cookie), Helmet (CSP, HSTS, Frameguard, noSniff, CORP/COEP).
-- **Rate limiting:** global and `/auth`-scoped throttling, with a custom exception filter that sets `Retry-After`.
-- **Brute-force protection:** guard + in-memory counter keyed by IP and email, time-windowed attempts and temporary locks, consistent `429` JSON.
-- **Authentication:**
-  - Access token (JWT) — short-lived, stored in an `httpOnly` cookie.
-  - Refresh token — rotated and tracked in DB (Prisma) with `jti`, `expiresAt`, and `revoked`, with reuse detection.
-- **Configuration:** everything registered via `@nestjs/config`, times expressed in human-friendly strings (via `ms`), prod/dev behavior toggled by `isProd`.
+> **Companion repo:** [notes-app-fe](../notes-app-fe) — React frontend with TipTap rich-text editor and inline note linking.
 
 ---
 
-## Middleware & Headers
+## Tech Stack
 
-### CORS
-
-- origin: `'http://localhost:5173'`
-- credentials: `true`
-- Methods: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`
-- Allowed headers: `Content-Type`, `Authorization`, `X-XSRF-TOKEN`
-
-This allows the SPA (Vite/React) to send credentialed requests (cookies) safely.
-
-### CSRF (`csurf`)
-
-- Double-submit cookie pattern:
-  - Backend sets an `httpOnly` cookie `XSRF-TOKEN`.
-  - Client echoes that value in the `X-XSRF-TOKEN` header for state-changing requests.
-- Cookie flags: `sameSite: 'strict'` and `secure: true` in production.
-
-### Helmet
-
-- CSP with secure defaults (restrictive `default-src`, `script-src`, and explicit `connect-src` to local dev host).
-- `frameguard: 'deny'`, `noSniff`, `dnsPrefetchControl: off`, `CORP = same-origin`.
-- COEP tightened in production: `crossOriginEmbedderPolicy: 'require-corp'` (or disabled in dev).
-- HSTS with a 7-day `maxAge`, `includeSubDomains`, and `preload`.
-
-`maxAge` is derived using `ms('7d') → seconds`, to keep config human-readable.
+| Category  | Technology                                                     |
+| --------- | -------------------------------------------------------------- |
+| Framework | NestJS 11 + TypeScript 5.7                                     |
+| Database  | PostgreSQL + Prisma ORM 6                                      |
+| Auth      | JWT (access + refresh) + httpOnly cookies                      |
+| Search    | PostgreSQL FTS — GIN indexes on JSONB                          |
+| Security  | Helmet, HSTS, CSRF double-submit, Throttler, Brute-force guard |
+| Runtime   | Node 20                                                        |
 
 ---
 
-## Rate Limiting
+## Getting Started
 
-### Throttling Profiles
+### Option A — Local (Node + PostgreSQL)
 
-- **Global:** 1m / 40 requests.
-- **Auth (/auth):** 1m / 25 requests.
+**Prerequisites:** Node 20+, PostgreSQL instance.
 
-### ThrottlerExceptionFilter
+```bash
+npm install
 
-- Automatically chooses the correct TTL (global vs `/auth`) by inspecting the request URL.
-- Sets the `Retry-After` header (in seconds).
-- Returns a consistent JSON:
+# Create .env (no .env.example in repo — create manually)
+cat > .env <<'EOF'
+DATABASE_URL=postgresql://user:password@localhost:5432/notes
+JWT_ACCESS_SECRET=your-access-secret
+JWT_REFRESH_SECRET=your-refresh-secret
+JWT_ACCESS_EXPIRE_IN=15
+JWT_REFRESH_EXPIRE_IN=14
+EOF
 
-```json
-{
-  "statusCode": 429,
-  "error": "Too Many Requests",
-  "message": "Rate limit exceeded. Please try again in N seconds."
+# Run migrations and generate Prisma client
+npm run db:migrate
+
+# Start dev server with watch
+npm run start:dev
+# → http://localhost:3000/api
+```
+
+### Option B — Docker Compose
+
+```bash
+# Requires .env in repo root (see above)
+docker compose up
+# Backend available at http://localhost:3000/api
+```
+
+Three services start in order: `db` (PostgreSQL) → `migrator` (runs `prisma migrate deploy`) → `backend`. No manual migration step needed.
+
+---
+
+## API Reference
+
+All routes are prefixed `/api`. JWT is required globally — endpoints marked **Public** opt out via `@PublicEndpoint()`.
+
+### Auth
+
+| Method | Endpoint          | Auth                     | Description                                   |
+| ------ | ----------------- | ------------------------ | --------------------------------------------- |
+| `POST` | `/auth/register`  | Public                   | Register; returns httpOnly cookies            |
+| `POST` | `/auth/login`     | Public + BruteForceGuard | Login; sets access + refresh cookies          |
+| `GET`  | `/auth/me`        | JWT                      | Returns JWT payload for current session       |
+| `POST` | `/auth/refresh`   | Public (rate-limited)    | Rotate refresh token; issue new access token  |
+| `POST` | `/auth/logout`    | JWT                      | Clear auth cookies                            |
+| `POST` | `/auth/revokeAll` | JWT                      | Invalidate all sessions (bump `tokenVersion`) |
+
+### CSRF
+
+| Method | Endpoint      | Auth   | Description                              |
+| ------ | ------------- | ------ | ---------------------------------------- |
+| `GET`  | `/csrf-token` | Public | Issue CSRF token (double-submit pattern) |
+
+### Notes
+
+| Method  | Endpoint        | Auth | Description                                   |
+| ------- | --------------- | ---- | --------------------------------------------- |
+| `GET`   | `/notes`        | JWT  | List all notes for current user               |
+| `POST`  | `/notes`        | JWT  | Create note (optional `parentId` for nesting) |
+| `GET`   | `/notes/search` | JWT  | Full-text search with cursor pagination       |
+| `GET`   | `/notes/:id`    | JWT  | Fetch note + children tree + optional parent  |
+| `PATCH` | `/notes/:id`    | JWT  | Update title / content                        |
+
+**`GET /notes/:id` query params:** `fields`, `children.fields`, `children.sort`, `children.limit`, `depth`, `expand=parent`
+
+**`GET /notes/search` query params:** `q` (required), `fields`, `order`, `limit`, `cursor`
+
+---
+
+## Architecture
+
+```
+src/
+├── main.ts                    # Bootstrap: CORS, CSRF, Helmet, ValidationPipe
+├── app.module.ts              # Root module — global guards registered here
+│
+├── modules/
+│   ├── auth/                  # Auth + CSRF controllers, JWT services, guards
+│   └── notes/                 # Notes controller + 3-layer service design
+│         ├── service/         # UserNotesService, NotesService, NotesTreeService, NotesSearchService
+│         └── utils/           # NotesPgRepository (raw SQL FTS), NoteMapper
+│
+├── infrastructure/
+│   ├── database/prisma/       # PrismaService, PrismaModule, FTS utilities
+│   └── security/              # Brute-force guard/service, throttle/helmet configs
+│
+└── core/                      # Framework-agnostic utilities
+    ├── tree/                  # Generic TreeService<T> (DFS + O(1) Map index)
+    ├── selector/              # FieldSelector — dynamic Prisma field projection
+    ├── sort/                  # buildOrderBy — "-createdAt" → Prisma orderBy
+    └── config/                # envString / envNumber / envSecret helpers
+```
+
+### Path aliases
+
+```
+@security   → src/infrastructure/security
+@core       → src/core
+@common     → src/common
+@database   → src/infrastructure/database
+```
+
+### Notes — 3-layer service design
+
+`NotesController` delegates exclusively to `UserNotesService` (orchestrator), which composes three focused services:
+
+```
+NotesController
+  └─ UserNotesService          ← orchestrator; no logic, only delegation
+       ├─ NotesService         ← Prisma CRUD; delegates FTS to NotesPgRepository
+       │     └─ NotesPgRepository  ← raw SQL with GIN-indexed plainto_tsquery FTS
+       ├─ NotesTreeService     ← tree loading (depth, children limit, sort)
+       │     └─ TreeService<T> ← generic DFS + Map<id, node> from @core/tree
+       └─ NotesSearchService   ← FTS orchestration + cursor pagination options
+```
+
+Each service has exactly one responsibility; `UserNotesService` is the only entry point for the controller, so adding a new operation never touches existing service boundaries.
+
+---
+
+## Database Schema
+
+```prisma
+model User {
+  id           String         @id @default(uuid())
+  email        String         @unique
+  password     String                              // bcrypt, 12 rounds
+  tokenVersion Int            @default(0)          // bumped on revokeAll
+  notes        Note[]
+  RefreshToken RefreshToken[]
+}
+
+model Note {
+  id       String        @id @default(uuid())
+  title    String
+  content  Json                                   // JSONB; GIN-indexed for FTS
+  userId   String
+  parentId String?                                // null = root note
+  parent   Note?         @relation("NoteToChildren", ...)
+  children Note[]        @relation("NoteToChildren")
+  versions NoteVersion[]                          // version history (endpoint in progress)
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  jti       String   @unique                      // per-token identity
+  userId    String
+  revoked   Boolean  @default(false)              // set true on rotation
+  expiresAt DateTime
 }
 ```
 
-# Brute-force Protection (login)
+---
 
-## BruteForceService (in-memory)
+## Authentication
 
-- Keys: `ip:<addr>` and `acct:<email>`.
-- Defaults:
-  - Window: 30s
-  - Max attempts: 20
-  - Lock: 2m
-- Resets counters after a successful login; increments after a failed one.
-- In production, consider a persistent store (e.g., Redis).
+### Token lifecycle
 
-## BruteForceGuard (applied to /auth/login)
+```
+Register / Login
+  ├─ issue access token (JWT, 15 min, httpOnly cookie)
+  └─ issue refresh token (JWT, 14 days, httpOnly cookie)
+       └─ persisted as RefreshToken record in DB (jti, expiresAt)
 
-- Builds keys (ip, email), stores them on `req.__bfKeys`.
-- If locked: logs a warning, sets `Retry-After`, and throws `TooManyRequestsException(retryAfter)`.
+POST /auth/refresh
+  ├─ verify refresh JWT (signature + expiry)
+  ├─ load User by payload.sub
+  ├─ check payload.tokenVersion === user.tokenVersion
+  ├─ issue new access token
+  └─ rotate refresh token (RefreshTokenService.rotate):
+       ├─ load RefreshToken by jti → check revoked = false
+       ├─ check expiresAt not expired
+       ├─ mark old RefreshToken revoked = true
+       └─ create new RefreshToken record + new refresh JWT
 
-## BruteForceExceptionFilter
+POST /auth/revokeAll
+  └─ UPDATE User SET tokenVersion = tokenVersion + 1
+       → all existing refresh tokens fail the tokenVersion check
+       → no DB scan over RefreshToken table needed (O(1))
+```
 
-- Catches `TooManyRequestsException`, sets `Retry-After`, returns a uniform `429` JSON with a `retryAfter` field.
+**Two invalidation mechanisms running in parallel:**
+
+- `RefreshToken.revoked` — per-token rotation (reuse detection on stolen tokens)
+- `User.tokenVersion` — global revoke-all (force-logout from all devices in one write)
+
+### Global guard strategy
+
+Both guards are registered as `APP_GUARD` providers in `AppModule` — they apply to every route automatically:
+
+```typescript
+{ provide: APP_GUARD, useClass: ThrottlerGuard },
+{ provide: APP_GUARD, useClass: JwtAuthGuard },
+```
+
+`JwtAuthGuard` checks for the `isPublic` metadata key set by `@PublicEndpoint()`:
+
+```typescript
+// common/decorators/public.decorator.ts
+export const PublicEndpoint = () => SetMetadata('isPublic', true);
+
+// JwtAuthGuard reads it via Reflector
+const isPublic = this.reflector.getAllAndOverride<boolean>('isPublic', [
+  context.getHandler(),
+  context.getClass(),
+]);
+if (isPublic) return true;
+```
+
+Routes that need to opt out (register, login, refresh, csrf-token) use `@PublicEndpoint()`. Everything else is protected by default with no extra annotation required.
 
 ---
 
-# Authentication & Sessions
+## Full-Text Search
 
-## Access Token (JWT)
+### Two-stage pattern
 
-- Issued by `AccessTokenService` using the JWT config (`secret`, `expiresIn`, e.g., `15m`).
-- Stored in an `httpOnly` cookie: `access_token` (with `sameSite` and `secure` toggled by `isProd`).
+FTS uses a deliberate two-stage approach to combine GIN index performance with Prisma's type-safe pagination:
 
-## JwtAuthGuard
+```
+Stage 1 — raw SQL via NotesPgRepository:
+  SELECT id FROM "Note"
+  WHERE "userId" = $userId
+  AND (
+    to_tsvector('simple', coalesce("title", ''))  @@ plainto_tsquery('simple', $q)
+    OR
+    to_tsvector('simple', "content")              @@ plainto_tsquery('simple', $q)
+  )
+  → returns: string[]  (matching IDs only)
 
-- Reads token from cookie, verifies it, and attaches the payload to `req.user`.
-- On failure: throws `401 Unauthorized`.
+Stage 2 — Prisma findMany:
+  note.findMany({
+    where: { userId, id: { in: matchingIds } },
+    select: { ...fieldSelector },
+    orderBy,
+    cursor: { id: cursorId },
+    take,
+  })
+  → returns: typed Note[] with field projection + cursor pagination
+```
 
-## Refresh Token (rotated with reuse detection)
+**Why two stages:** GIN indexes make stage 1 fast on JSONB, but Prisma cannot express `to_tsvector @@ plainto_tsquery` in its query builder. Splitting keeps GIN efficiency for matching and Prisma's type safety for everything downstream (projection, sorting, pagination).
 
-- Issued by `RefreshTokenService`:
-  - Generates a `jti`.
-  - Computes `expiresAt` from `refresh-jwt.expiresIn` (e.g., `'7d'` → `Date` via `ms`-based helper).
-  - Persists a `RefreshToken` record (Prisma).
-  - Signs a refresh JWT with payload: `sub`, `email`, `jti`, `tokenVersion`.
+**Why `plainto_tsquery`:** accepts raw user input without requiring the user to know tsquery syntax. `'hello world'` → searches for documents containing both words.
 
-### Rotation flow (`POST /auth/refresh`)
+**Why cursor pagination instead of OFFSET:** results stay stable when notes are added or updated between pages. `OFFSET N` can skip or repeat rows if the result set changes; a cursor keyed on `id` cannot.
 
-1. Verify refresh JWT (`secret`, `exp`).
-2. Lookup by `jti` in DB:
-   - No record or `revoked = true` ⇒ reuse detected → 401.
-   - `expiresAt` in the past ⇒ expired → 401.
-3. Revoke old record (`revoked = true`).
-4. Issue: new DB record + new refresh JWT + new access JWT.
+### GIN indexes (created in migration)
 
-## Revoke All Sessions
+```sql
+CREATE INDEX note_title_fts_idx
+  ON "Note" USING GIN (to_tsvector('simple', coalesce("title", '')));
 
-- `updateMany` (by userId) setting `revoked = true` to force-logout from all devices.
+CREATE INDEX note_content_fts_idx
+  ON "Note" USING GIN (to_tsvector('simple', "content"));
+```
 
-## Cookies (`setAuthCookies`)
-
-- Helper sets `access_token` and `refresh_token` cookies with `httpOnly`, `sameSite`, `secure` (prod), and correct `maxAge`.
-- Durations are derived from typed config values (`"15m"`, `"7d"`) → seconds.
-
----
-
-# Configuration & Time Handling
-
-- All configs are registered via `@nestjs/config` (`registerAs`) and consumed with proper typing:
-  - `jwt (access): { secret, expiresIn: "15m" }`
-  - `refresh-jwt: { secret, expiresIn: "7d" }`
-  - `bruteForce: { windowMs: ms("30s"), maxAttempts: 20, lockMs: ms("2m") }`
-- `ms` library standardizes durations across the app (`"30s"` | `"2m"` | `"7d"` → milliseconds).
-- `isProd` toggles stricter security (cookies, headers, COEP/COEP).
+`'simple'` dictionary: no stemming, no stop words — searches match the literal token. Appropriate for user-generated note content where stemming would produce surprising results.
 
 ---
 
-# Module Structure (high level)
+## Security Hardening
 
-- `infrastructure/security`
-  - Config: `cors.config.ts`, `csrf.config.ts`, `helmet.config.ts`, `throttle.config.ts`, `bruteForce.config.ts`
-  - Guards & Filters: `BruteForceGuard`, `BruteForceExceptionFilter`, `ThrottlerExceptionFilter`
-  - Services: `BruteForceService`
-  - Module: `SecurityModule` (registers configs and global filters)
-- `modules/auth`
-  - Config: `jwt.config.ts`, `refreshJwt.config.ts`
-  - Services: `AccessTokenService`, `RefreshTokenService`
-  - Guards: `JwtAuthGuard`
-  - Utils: `cookie.util.ts`, `expiresIn.ts` (computes `expiresAt`)
-  - DB: Prisma model `RefreshToken` (with `jti`, `revoked`, `expiresAt`)
+| Layer         | Config                                                                                                |
+| ------------- | ----------------------------------------------------------------------------------------------------- |
+| CSRF          | Double-submit cookie — backend sets `XSRF-TOKEN` cookie; client echoes value in `X-CSRF-Token` header |
+| Helmet        | CSP, `frameguard: deny`, `noSniff`, CORP `same-origin`, COEP `require-corp` (prod)                    |
+| HSTS          | `maxAge: 7d`, `includeSubDomains`, `preload`                                                          |
+| Rate limiting | Global: 40 req/min · Auth routes: 25 req/min                                                          |
+| Brute-force   | Per IP + per email · window: 30s · max: 20 attempts · lock: 2 min                                     |
+| Passwords     | bcrypt, 12 rounds                                                                                     |
 
 ---
 
-# Quick Test Scenarios
+## Scripts
 
-1. **Brute-force lock**
-   - Send 20 invalid `/auth/login` attempts within 30 s.
-   - Expect `429` with `Retry-After` header and JSON body containing `retryAfter`.
-2. **Global rate limit**
-   - Send 40 requests to any non-auth route within 60 s.
-   - Expect `429` with consistent JSON and `Retry-After`.
-3. **Refresh rotation**
-   - Login → get refresh A1.
-   - Call `/auth/refresh` → get A2 (new refresh), and DB shows A1 `revoked = true`.
-4. **Reuse detection**
-   - After rotation, call `/auth/refresh` again using A1.
-   - Expect `401` with message like `"Refresh token reuse detected"`.
-5. **Revoke all**
-   - Call the “revoke all” endpoint (force logout).
-   - Expect all user’s refresh token records set to `revoked = true`.
-
----
-
-# Why This Matters
-
-- Defense in depth: headers + CORS/CSRF + throttling + brute-force + secure cookies + refresh rotation.
-- Session safety: `httpOnly` cookies, short-lived access JWT, rotated refresh with reuse detection.
-- Consistent errors: custom exception filters set `Retry-After` and return uniform JSON responses.
-- Clean configuration: secrets and durations centralized and typed; easy to tune.
-
----
-
-# Tuning Knobs
-
-- Durations & limits (single source of truth):
-  - `jwt.expiresIn`, `refresh-jwt.expiresIn`
-  - `bruteForce.windowMs`, `bruteForce.maxAttempts`, `bruteForce.lockMs`
-  - `throttle.*.ttl`, `throttle.*.limit`
-  - `hsts.maxAge` (e.g., `ms('7d')`)
-- Cookies: `secure`, `sameSite` based on `isProd`.
-- CSP/COEP: tighten allow-lists and cross-origin policies for production as needed.
-
----
+| Command               | Description                              |
+| --------------------- | ---------------------------------------- |
+| `npm run start:dev`   | Dev server with watch mode               |
+| `npm run build`       | Compile to `dist/`                       |
+| `npm run start:prod`  | Run compiled build                       |
+| `npm run test`        | Unit tests (Jest)                        |
+| `npm run test:e2e`    | End-to-end tests                         |
+| `npm run db:migrate`  | Run Prisma migrations + generate client  |
+| `npm run db:generate` | Generate Prisma client only              |
+| `npm run db:reset`    | Reset database and re-run all migrations |
+| `npm run lint`        | ESLint with auto-fix                     |
