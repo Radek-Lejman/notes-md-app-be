@@ -23,6 +23,7 @@
     "db:reset": "prisma migrate reset"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.288",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.1",
@@ -40,7 +41,8 @@
     "joi": "^18.0.0",
     "ms": "^2.1.3",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
@@ -86,6 +88,14 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^@ai(.*)$": "<rootDir>/infrastructure/ai$1",
+      "^@core(.*)$": "<rootDir>/core$1",
+      "^@security(.*)$": "<rootDir>/infrastructure/security$1",
+      "^@common(.*)$": "<rootDir>/common$1",
+      "^@database(.*)$": "<rootDir>/infrastructure/database$1",
+      "^src/(.*)$": "<rootDir>/$1"
+    }
   }
 }
