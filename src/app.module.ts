@@ -11,12 +11,14 @@ import {
 import { APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './infrastructure/database/prisma/prisma.module';
 import { NotesModule } from './modules/notes/notes.module';
+import { AiModule } from './modules/ai/ai.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwtAuthGuard.guard';
 
 @Module({
   imports: [
     AuthModule,
     NotesModule,
+    AiModule,
     PrismaModule,
     ConfigModule.forRoot({
       isGlobal: true,
