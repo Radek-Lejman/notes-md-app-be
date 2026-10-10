@@ -21,6 +21,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset",
+    "db:backfill-content-md": "ts-node -r tsconfig-paths/register -T scripts/backfill-content-md.ts",
     "ai:smoke": "ts-node -r tsconfig-paths/register -T scripts/ai-smoke.ts",
     "test:ai": "jest infrastructure/ai modules/ai modules/notes/utils/tiptapToText --coverage --collectCoverageFrom='infrastructure/ai/**/*.ts' --collectCoverageFrom='modules/ai/**/*.ts' --collectCoverageFrom='modules/notes/utils/tiptapToText.ts' --collectCoverageFrom='!**/*.spec.ts' --collectCoverageFrom='!infrastructure/ai/testing/**' --coverageThreshold='{\"global\":{\"branches\":100,\"functions\":100,\"lines\":100,\"statements\":100}}'"
   },
