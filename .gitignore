@@ -44,7 +44,6 @@ lerna-debug.log*
 
 # Prisma (generated or local files)
 prisma/.env
-prisma/migrations/
 *.sqlite
 *.sqlite-journal
 preview.sql
