@@ -9,12 +9,11 @@ import {
   NotFoundException,
   Param,
   Post,
-  Put,
   Patch,
   Query,
 } from '@nestjs/common';
 import { UserNotesService } from '../service/userNotes.service';
-import { Note, NoteWithFamily } from '../interfaces/notes.interface';
+import { Note, NoteSearchResult, NoteSummary, NoteWithFamily } from '../interfaces/notes.interface';
 import { CreateNoteDto, UpdateNoteDto } from '../dto/note.dto';
 import { GetNoteQueryDto } from '../dto/getNoteQuery.dto';
 import { AuthUser } from '@security';
@@ -28,7 +27,7 @@ export class NotesController {
   constructor(private readonly notesService: UserNotesService) {}
 
   @Get('')
-  async getAll(@CurrentUser() user: AuthUser): Promise<Note[] | null> {
+  async getAll(@CurrentUser() user: AuthUser): Promise<NoteSummary[] | null> {
     const userNotes = await this.notesService.getAllNotes(user.sub);
     this.logger.log(userNotes);
 
@@ -45,7 +44,7 @@ export class NotesController {
   async search(
     @CurrentUser() user: AuthUser,
     @Query() query: SearchNotesQueryDto,
-  ): Promise<Note[]> {
+  ): Promise<NoteSearchResult[]> {
     [query.fields, query['children.fields']].forEach((f) => validateAndNormalizeFields(f));
     if (!query.q?.trim()) {
       throw new BadRequestException('Query "q" is required');

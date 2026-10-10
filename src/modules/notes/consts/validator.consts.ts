@@ -15,3 +15,6 @@ export const DEFAULT_DEPTH = 0;
 
 // General params
 export const MIN_CONTENT_LENGTH = 2;
+
+// Note content (markdown), in characters
+export const MAX_CONTENT_LENGTH = 1_000_000;

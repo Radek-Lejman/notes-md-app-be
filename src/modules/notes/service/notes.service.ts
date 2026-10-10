@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/infrastructure/database/prisma/prisma.service';
-import { Note, NoteBase, NoteSelector } from '../interfaces/notes.interface';
+import { Note, NoteBase, NoteSelector, NoteSummary } from '../interfaces/notes.interface';
 import { UpdateNoteDto } from '../dto/note.dto';
 import { Prisma } from '@prisma/client';
 import { NoteSearchOptions } from '../interfaces/NoteSearch';
@@ -11,7 +11,8 @@ import { NotesPgRepository } from '../utils/notesPgRepository';
 export class NotesService {
   constructor(
     private readonly notesPgRepository: NotesPgRepository,
-    private readonly prismaService: PrismaService) {}
+    private readonly prismaService: PrismaService,
+  ) {}
 
   async updateNote(note: UpdateNoteDto, noteId: string, userId: string): Promise<Note> {
     const updated = await this.prismaService.note.update({
@@ -23,21 +24,21 @@ export class NotesService {
     });
     return NoteMapper.toDomain(updated);
   }
-  
+
   public async createNote(note: NoteBase, userId: string): Promise<Note> {
     const created = await this.prismaService.note.create({
       data: NoteMapper.toPersistenceCreate(note, userId),
     });
     return NoteMapper.toDomain(created);
   }
-  
-  public async getAllNotes(userId: string): Promise<Note[]> {
-    const notes = await this.prismaService.note.findMany({
+
+  public async getAllNotes(userId: string): Promise<NoteSummary[]> {
+    return this.prismaService.note.findMany({
       where: {
         userId,
       },
+      omit: { content: true },
     });
-    return NoteMapper.toDomainList(notes);
   }
 
   public async getNoteById(
@@ -56,7 +57,7 @@ export class NotesService {
         parentId: true,
       },
     });
-    return NoteMapper.toDomain(note) as Note | null;
+    return NoteMapper.toDomain(note);
   }
 
   public async getNoteByParentId(
@@ -84,7 +85,7 @@ export class NotesService {
     const cursorId = options.cursorId;
 
     // Two-stage search pattern: retains Prisma's pagination and type-safety,
-    // while leveraging efficient PostgreSQL GIN indexes for FTS on JSONB fields.
+    // while leveraging efficient PostgreSQL GIN indexes for FTS on the markdown content.
     const searchResults = await this.notesPgRepository.searchNotesDb(userId, q);
 
     const matchingIds = searchResults.map((row) => row.id);

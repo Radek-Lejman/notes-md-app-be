@@ -2,7 +2,8 @@ import { FieldSelector } from '@core/selector/types';
 
 export interface NoteBase {
   title: string;
-  content: TiptapNode;
+  /** Markdown. */
+  content: string;
   parentId?: string | null;
 }
 
@@ -21,14 +22,10 @@ export interface NoteWithChildren {
 }
 export type NoteWithFamily = Partial<Note> & NoteWthParent & NoteWithChildren;
 
+/** A note in lists and trees: everything but the (potentially large) content. */
+export type NoteSummary = Omit<Note, 'content'>;
+
+/** A search hit: the requested fields plus a plain-text excerpt around the match. */
+export type NoteSearchResult = Partial<Note> & { id: string; snippet: string };
+
 export type NoteSelector = FieldSelector<Note>;
-
-
-export type TiptapNode = {
-  type: string;
-  attrs?: Record<string, unknown>;
-  content?: TiptapNode[];
-  marks?: Record<string, unknown>[];
-  text?: string;
-};
-

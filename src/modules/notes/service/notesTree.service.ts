@@ -11,6 +11,7 @@ import { DEFAULT_CHILDREN_LIMIT, DEFAULT_CHILDREN_SORT_FIELD } from '../consts/v
 import { AdapterTreeNotes } from '../utils/notesToTree';
 import { clampDepth } from '../utils/note.utils';
 import { NotesSortInput } from '../interfaces/notesQuery.interface';
+import { DEFAULT_CHILDREN_FIELDS, DEFAULT_ROOT_FIELDS } from '../consts/allowedNoteFields';
 
 @Injectable()
 export class NotesTreeService {
@@ -50,7 +51,7 @@ export class NotesTreeService {
   private async loadChildrenTree(
     notesTree: TreeService<Note>,
     query: GetNoteQueryDto,
-    userId: string
+    userId: string,
   ): Promise<TreeService<Note>> {
     const depth = this.getDepthParam(query);
     if (depth === 0) {
@@ -75,7 +76,7 @@ export class NotesTreeService {
           searchedNotesIds,
           rootChildrenSelector,
           this.getChildrenOrderBy(query['children.sort']),
-          userId
+          userId,
         )) ?? [];
 
       if (!notesInCurrentDepth.length) {
@@ -111,12 +112,10 @@ export class NotesTreeService {
     return notesTree;
   }
 
-  private buildRootNodeSelector(query: {
-    fields?: string;
-  }): FieldSelector<Record<string, true>> {
+  private buildRootNodeSelector(query: { fields?: string }): FieldSelector<Record<string, true>> {
     const rootNotesFields = fromStringToArray(query.fields);
     if (!rootNotesFields || rootNotesFields.length === 0) {
-      return buildFieldSelector(['id', 'title', 'content', 'parentId', 'createdAt', 'updatedAt']);
+      return buildFieldSelector(DEFAULT_ROOT_FIELDS);
     }
 
     return buildFieldSelector(rootNotesFields);
@@ -129,8 +128,9 @@ export class NotesTreeService {
     const rootChildrenFields =
       fromStringToArray(query['children.fields']) || fromStringToArray(query.fields);
 
+    // Children are listed, not read: their (possibly large) markdown only on explicit request.
     if (!rootChildrenFields || rootChildrenFields.length === 0) {
-      return buildFieldSelector(['id', 'title', 'content', 'parentId', 'createdAt', 'updatedAt']);
+      return buildFieldSelector(DEFAULT_CHILDREN_FIELDS);
     }
 
     return buildFieldSelector(rootChildrenFields);

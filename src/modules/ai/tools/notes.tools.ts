@@ -3,7 +3,6 @@ import { AgentTool, defineAgentTool } from '@ai';
 import { UserNotesService } from 'src/modules/notes/service/userNotes.service';
 import { GetNoteQueryDto } from 'src/modules/notes/dto/getNoteQuery.dto';
 import { SearchNotesQueryDto } from 'src/modules/notes/dto/searchNotesQueryDto';
-import { tiptapToText } from 'src/modules/notes/utils/tiptapToText';
 import { Note } from 'src/modules/notes/interfaces/notes.interface';
 import { AGENT_NOTE_MAX_CHARS, AGENT_SEARCH_LIMIT } from '../consts/ai.consts';
 
@@ -31,7 +30,7 @@ export function createNotesTools(notes: UserNotesService, userId: string): Agent
 
     defineAgentTool({
       name: 'get_note',
-      description: 'Get a single note (title and plain-text content) by its id.',
+      description: 'Get a single note (title and markdown content) by its id.',
       inputSchema: { id: z.string().describe('Note id from search_notes') },
       handler: async ({ id }) => {
         const dto = Object.assign(new GetNoteQueryDto(), { fields: 'title,content' });
@@ -41,7 +40,7 @@ export function createNotesTools(notes: UserNotesService, userId: string): Agent
         return {
           id: note.id,
           title: note.title,
-          content: tiptapToText(note.content).slice(0, AGENT_NOTE_MAX_CHARS),
+          content: note.content.slice(0, AGENT_NOTE_MAX_CHARS),
         };
       },
     }),

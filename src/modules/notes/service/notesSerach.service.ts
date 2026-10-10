@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { NotesService } from './notes.service';
-import { Note } from '../interfaces/notes.interface';
+import { NoteSearchResult } from '../interfaces/notes.interface';
 import { SearchNotesQueryDto } from '../dto/searchNotesQueryDto';
 import { FieldSelector } from '@core/selector/types';
 import { fromStringToArray } from '@core/utils';
@@ -8,6 +8,7 @@ import { buildFieldSelector } from '@core/selector/utils';
 import { decodeCursor } from '../utils/searchCursorPayload';
 import { toTsQuery } from '@database/prisma';
 import { buildNoteSearchOrderBy } from '../utils/orderByForSearch';
+import { buildSnippet } from '../utils/markdownText';
 
 @Injectable()
 export class NotesSearchService {
@@ -15,9 +16,8 @@ export class NotesSearchService {
 
   constructor(private readonly notesService: NotesService) {}
 
-  async searchByText(sub: string, query: SearchNotesQueryDto): Promise<Note[]> {
+  async searchByText(sub: string, query: SearchNotesQueryDto): Promise<NoteSearchResult[]> {
     const rootSelector = this.buildRootNodeSelector(query);
-
     if (!rootSelector) {
       return [];
     }
@@ -27,19 +27,24 @@ export class NotesSearchService {
     const take = query.limit;
 
     const tsq = toTsQuery(query.q);
-
     if (!tsq) {
       this.logger.log(`Skip FTS – empty tsquery for input: "${query.q}"`);
       return [];
     }
 
-    const foundNotes = await this.notesService.getNoteByText(sub, rootSelector, tsq, {
-      orderBy: buildNoteSearchOrderBy(query.order, tsq),
-      take,
-      cursorId,
-    });
+    // Content is always loaded for the snippet, but only returned when it was asked for.
+    const foundNotes = await this.notesService.getNoteByText(
+      sub,
+      { ...rootSelector, content: true },
+      tsq,
+      { orderBy: buildNoteSearchOrderBy(query.order, tsq), take, cursorId },
+    );
 
-    return foundNotes ?? [];
+    return (foundNotes ?? []).map(({ content, ...note }) => ({
+      ...note,
+      ...(rootSelector.content && { content }),
+      snippet: buildSnippet(content ?? '', query.q),
+    }));
   }
 
   private buildRootNodeSelector(query: {

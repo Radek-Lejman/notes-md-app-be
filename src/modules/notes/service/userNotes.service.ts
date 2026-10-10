@@ -1,6 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { NotesService } from './notes.service';
-import { Note, NoteBase } from '../interfaces/notes.interface';
+import {
+  Note,
+  NoteBase,
+  NoteSearchResult,
+  NoteSummary,
+  NoteWithFamily,
+} from '../interfaces/notes.interface';
 import { UpdateNoteDto } from '../dto/note.dto';
 import { GetNoteQueryDto } from '../dto/getNoteQuery.dto';
 import { SearchNotesQueryDto } from '../dto/searchNotesQueryDto';
@@ -22,7 +28,7 @@ export class UserNotesService {
   public createNote(note: NoteBase, userId: string): Promise<Note | null> {
     return this.notesService.createNote(note, userId);
   }
-  public getAllNotes(userId: string): Promise<Note[] | null> {
+  public getAllNotes(userId: string): Promise<NoteSummary[] | null> {
     return this.notesService.getAllNotes(userId);
   }
 
@@ -30,13 +36,13 @@ export class UserNotesService {
     id: string,
     query: GetNoteQueryDto,
     userId: string,
-  ): Promise<any | null> {
+  ): Promise<NoteWithFamily | null> {
     const note = await this.notesTreeService.getNoteWithFamily(id, query, userId);
 
     return note;
   }
 
-  async searchByText(sub: string, query: SearchNotesQueryDto): Promise<Note[]> {
+  async searchByText(sub: string, query: SearchNotesQueryDto): Promise<NoteSearchResult[]> {
     const note = await this.notesSearchService.searchByText(sub, query);
     return note;
   }

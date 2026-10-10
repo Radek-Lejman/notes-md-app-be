@@ -1,4 +1,4 @@
-import { TiptapNode } from '../interfaces/notes.interface';
+import { TiptapNode } from './tiptapToMarkdown';
 
 const BLOCK_NODES = new Set(['paragraph', 'heading', 'listItem', 'blockquote', 'codeBlock']);
 
