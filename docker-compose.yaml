@@ -50,5 +50,12 @@ services:
         condition: service_completed_successfully
     volumes:
       - ./:/app
+  frontend:
+    build: ../notes-app-fe
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../notes-app-fe/:/app
+      - /app/node_modules
 volumes:
   postgres_data:
