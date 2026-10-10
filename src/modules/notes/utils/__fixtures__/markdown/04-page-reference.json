@@ -1,0 +1,37 @@
+{
+  "type": "doc",
+  "content": [
+    { "type": "heading", "attrs": { "level": 1 }, "content": [{ "type": "text", "text": "Projekty" }] },
+    { "type": "paragraph", "content": [{ "type": "text", "text": "Powiązane notatki:" }] },
+    {
+      "type": "pageReference",
+      "attrs": { "noteId": "3f2a9c1e-8b7d-4e6a-9f10-2c4d5e6f7a8b", "title": "Docker – notatki" }
+    },
+    {
+      "type": "pageReference",
+      "attrs": { "noteId": "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d", "title": "Plan [v2]" }
+    },
+    {
+      "type": "paragraph",
+      "content": [
+        { "type": "text", "text": "Więcej w " },
+        {
+          "type": "text",
+          "marks": [
+            {
+              "type": "link",
+              "attrs": {
+                "href": "https://docs.docker.com",
+                "target": "_blank",
+                "rel": "noopener noreferrer nofollow",
+                "class": null
+              }
+            }
+          ],
+          "text": "dokumentacji"
+        },
+        { "type": "text", "text": "." }
+      ]
+    }
+  ]
+}
