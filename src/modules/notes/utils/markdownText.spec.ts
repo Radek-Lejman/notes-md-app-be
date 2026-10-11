@@ -5,6 +5,7 @@ describe('markdownToPlainText', () => {
     ['headings', '## Instalacja', 'Instalacja'],
     ['emphasis', '**bold**, *italic*, ~~strike~~ and `code`', 'bold, italic, strike and code'],
     ['lists', '- a\n  - b\n1. c\n2) d', 'a b c d'],
+    ['task list checkboxes', '- [x] done\n- [ ] todo\n  - [X] nested', 'done todo nested'],
     ['quotes', '> cytat\n>\n> dalej', 'cytat dalej'],
     ['links (text only)', 'Zobacz [docs](https://example.com/a_b).', 'Zobacz docs.'],
     ['page references', '[Docker](/notes/3f2a9c1e-8b7d-4e6a-9f10-2c4d5e6f7a8b)', 'Docker'],

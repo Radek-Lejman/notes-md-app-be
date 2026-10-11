@@ -7,6 +7,7 @@ import {
 import StarterKit from '@tiptap/starter-kit';
 import HardBreak from '@tiptap/extension-hard-break';
 import CodeBlock from '@tiptap/extension-code-block';
+import { TaskItem, TaskList } from '@tiptap/extension-list';
 import type { MarkdownManager } from '@tiptap/markdown';
 import { escapeInline, escapeMarkdownDoc, unescapeMarkdown } from './markdownEscape';
 
@@ -18,6 +19,8 @@ import { escapeInline, escapeMarkdownDoc, unescapeMarkdown } from './markdownEsc
  * - hard breaks are written as trailing double spaces, which editors strip -> `\` + newline
  * - a code block containing ``` is closed early -> fence longer than any backtick run inside
  * - the editor's trailing empty paragraph is written as `&nbsp;` -> trimmed on serialize
+ *
+ * Task lists are GFM (`- [ ] todo`, `- [x] done`).
  */
 
 const EMPTY_PARAGRAPH = '&nbsp;';
@@ -47,7 +50,15 @@ export const MarkdownCodeBlock = CodeBlock.extend({
 
 /** Editor extensions every markdown-backed editor (and the backend converter) must share. */
 export const createMarkdownExtensions = () => [
-  StarterKit.configure({ underline: false, hardBreak: false, codeBlock: false }),
+  StarterKit.configure({
+    underline: false,
+    hardBreak: false,
+    codeBlock: false,
+    // Clicking a link places the caret; links open from the link menu or with Mod+click.
+    link: { openOnClick: false, defaultProtocol: 'https' },
+  }),
+  TaskList,
+  TaskItem.configure({ nested: true }),
   MarkdownHardBreak,
   MarkdownCodeBlock,
   MarkdownEscape,

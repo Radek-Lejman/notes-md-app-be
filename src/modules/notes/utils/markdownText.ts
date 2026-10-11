@@ -1,6 +1,7 @@
 const FENCE_LINE = /^ {0,3}(`{3,}|~{3,}).*$/gm;
 const LINK = /!?\[((?:\\.|[^\\\]])*)\]\([^)\s]*\)/g;
 const NBSP = /&(?:nbsp|#160);/gi;
+const TASK_MARKER = /^([ \t]*[-+*][ \t]+)\[[ xX]\](?=[ \t]|$)/gm;
 const BLOCK_MARKER = /^[ \t]*(?:#{1,6}|>|[-+*]|\d+[.)])(?=[ \t]|$)/gm;
 const THEMATIC_BREAK = /^[ \t]*(?:-{3,}|\*{3,}|_{3,})[ \t]*$/gm;
 const UNESCAPED_DELIMITER = /(?<!\\)[*_~`]+/g;
@@ -17,6 +18,7 @@ export function markdownToPlainText(markdown: string): string {
     .replace(NBSP, ' ')
     .replace(HARD_BREAK, '\n')
     .replace(THEMATIC_BREAK, '')
+    .replace(TASK_MARKER, '$1')
     .replace(BLOCK_MARKER, '')
     .replace(UNESCAPED_DELIMITER, '')
     .replace(ESCAPED, '$1')
