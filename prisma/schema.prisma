@@ -7,12 +7,13 @@
 generator client {
   provider        = "prisma-client-js"
   binaryTargets   = ["native", "linux-arm64-openssl-3.0.x"]
-  previewFeatures = ["fullTextSearchPostgres"]
+  previewFeatures = ["fullTextSearchPostgres", "postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
 }
 
 model User {
@@ -24,6 +25,21 @@ model User {
   updatedAt    DateTime       @updatedAt
   notes        Note[]
   RefreshToken RefreshToken[]
+  aiCredential AiCredential?
+}
+
+/// The user's own Claude credential (subscription OAuth token or Console API key).
+model AiCredential {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// 'claude-oauth-token' | 'anthropic-api-key'
+  type      String
+  /// AES-256-GCM ciphertext bound to userId (see SecretBox); never returned by the API.
+  secret    String
+  /// Last characters of the secret, shown in the UI.
+  hint      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model NoteVersion {
@@ -53,6 +69,29 @@ model Note {
   children Note[]  @relation("NoteToChildren")
 
   versions NoteVersion[]
+  chunks   NoteChunk[]
+
+  /// `updatedAt` of the version embedded for RAG; null/older = needs (re)indexing.
+  ragIndexedAt DateTime?
+}
+
+/// RAG: a piece of a note with its embedding. Written with raw SQL (vector column).
+model NoteChunk {
+  id          String                @id @default(uuid())
+  noteId      String
+  note        Note                  @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  userId      String
+  chunkIndex  Int
+  /// "Title > Heading > Subheading" of the chunk.
+  headingPath String
+  content     String
+  /// Embedding model; vectors of other models are ignored and re-indexed.
+  model       String
+  embedding   Unsupported("vector")
+  createdAt   DateTime              @default(now())
+
+  @@index([userId, model])
+  @@index([noteId])
 }
 
 model RefreshToken {

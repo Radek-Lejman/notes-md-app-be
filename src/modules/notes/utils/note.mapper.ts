@@ -2,8 +2,8 @@ import { Prisma, Note as PrismaNote } from '@prisma/client';
 import { Note, NoteBase } from '../interfaces/notes.interface';
 import { UpdateNoteDto } from '../dto/note.dto';
 
-/** A note row as loaded by PrismaService, which never loads the legacy JSON. */
-type NoteRow = Omit<PrismaNote, 'contentLegacy'>;
+/** A note row as loaded by PrismaService, which never loads the legacy JSON or RAG bookkeeping. */
+type NoteRow = Omit<PrismaNote, 'contentLegacy' | 'ragIndexedAt'>;
 
 export class NoteMapper {
   static toDomain(prismaNote: NoteRow): Note;
