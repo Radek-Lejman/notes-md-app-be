@@ -5,17 +5,19 @@ import { LlmCompletionRequest, LlmCompletionResult, LlmProvider } from '../../ty
 import { ClaudeCliConfig } from '../../config/ai.config';
 import { LlmProviderError } from '../../errors/llm-provider.error';
 import { ClaudeCliJsonResult } from './claude-cli.types';
+import { prepareClaudeEnv } from '../claude-auth';
 
 /**
  * Calls Claude through the locally installed Claude Code CLI in headless mode
- * (`claude -p`). Auth comes from the CLI login (`claude /login`), so requests
- * count against the Pro/Max subscription instead of paid API credits.
+ * (`claude -p`). Auth per request (see prepareClaudeEnv): the user's own token/API key,
+ * or the host CLI login.
  *
  * Dev/POC only: requires the `claude` binary + login on the host running the
  * backend, and spawns one process per request.
  */
 export class ClaudeCliProvider implements LlmProvider {
   readonly name = 'claude-cli' as const;
+  readonly usesAccountAuth = true;
   private readonly logger = new Logger(ClaudeCliProvider.name);
 
   constructor(private readonly config: ClaudeCliConfig) {}
@@ -42,7 +44,13 @@ export class ClaudeCliProvider implements LlmProvider {
       args.push('--system-prompt', request.systemPrompt);
     }
 
-    const stdout = await this.run(args, request.prompt);
+    const { env, cleanup } = await prepareClaudeEnv(request.auth);
+    let stdout: string;
+    try {
+      stdout = await this.run(args, request.prompt, env);
+    } finally {
+      await cleanup();
+    }
     const parsed = this.parse(stdout);
 
     return {
@@ -53,11 +61,7 @@ export class ClaudeCliProvider implements LlmProvider {
     };
   }
 
-  private run(args: string[], stdin: string): Promise<string> {
-    // Drop API key so the CLI uses the subscription login, not pay-as-you-go API billing.
-    const env = { ...process.env };
-    delete env.ANTHROPIC_API_KEY;
-
+  private run(args: string[], stdin: string, env: NodeJS.ProcessEnv): Promise<string> {
     return new Promise((resolve, reject) => {
       const child = spawn(this.config.bin, args, {
         env,

@@ -10,6 +10,7 @@ import { OllamaMessage, OllamaTool } from './ollama.types';
  */
 export class OllamaAgentProvider implements AgentProvider {
   readonly name = 'ollama' as const;
+  readonly usesAccountAuth = false;
 
   constructor(
     private readonly client: OllamaClient,

@@ -1,4 +1,5 @@
 import type { z } from 'zod';
+import type { AiAuth } from './auth.types';
 
 /**
  * Provider-agnostic agent contract. An agent = LLM + tool-calling loop.
@@ -29,9 +30,14 @@ export interface AgentRunRequest {
   tools: AgentTool[];
   /** Aborts the run (e.g. client disconnected). */
   signal?: AbortSignal;
+  /** Account to run on; defaults to the server login. */
+  auth?: AiAuth;
 }
 
 export type AgentEvent =
+  /** Incremental chunk of the text block being generated (only from streaming providers). */
+  | { type: 'text_delta'; text: string }
+  /** A complete text block. Always sent, also after its text_delta chunks. */
   | { type: 'text'; text: string }
   | { type: 'tool_call'; tool: string; input: unknown }
   | { type: 'tool_result'; tool: string; isError: boolean }
@@ -40,5 +46,7 @@ export type AgentEvent =
 
 export interface AgentProvider {
   readonly name: AgentProviderName;
+  /** True when runs are billed to a user account (Claude), so `auth` matters. */
+  readonly usesAccountAuth: boolean;
   run(request: AgentRunRequest): AsyncIterable<AgentEvent>;
 }

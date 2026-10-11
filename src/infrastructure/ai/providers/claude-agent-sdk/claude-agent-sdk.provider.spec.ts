@@ -116,6 +116,7 @@ describe('ClaudeAgentSdkProvider', () => {
         strictMcpConfig: true,
         settingSources: [],
         persistSession: false,
+        includePartialMessages: true,
       });
       expect(queryOptions().abortController).toBeInstanceOf(AbortController);
     });
@@ -124,6 +125,12 @@ describe('ClaudeAgentSdkProvider', () => {
       process.env.ANTHROPIC_API_KEY = 'sk-secret';
       await run();
       expect(queryOptions().env).not.toHaveProperty('ANTHROPIC_API_KEY');
+    });
+
+    it("runs on the user's own token when auth is given", async () => {
+      await run({ auth: { kind: 'claude-oauth-token', token: 'user-token' } });
+      expect(queryOptions().env.CLAUDE_CODE_OAUTH_TOKEN).toBe('user-token');
+      expect(queryOptions().env.CLAUDE_CONFIG_DIR).toBeDefined();
     });
 
     it('exposes tools via an in-process MCP server named "app"', async () => {
@@ -164,6 +171,32 @@ describe('ClaudeAgentSdkProvider', () => {
   });
 
   describe('SDK message -> AgentEvent mapping', () => {
+    const streamEvent = (event: object, parentToolUseId: string | null = null) => ({
+      type: 'stream_event',
+      event,
+      parent_tool_use_id: parentToolUseId,
+    });
+    const textDelta = (text: string) => ({
+      type: 'content_block_delta',
+      index: 0,
+      delta: { type: 'text_delta', text },
+    });
+
+    it('maps top-level text deltas to text_delta, ignoring other stream events', async () => {
+      streamMessages(
+        streamEvent({ type: 'message_start' }),
+        streamEvent(textDelta('Hel')),
+        streamEvent({ type: 'content_block_delta', delta: { type: 'input_json_delta' } }),
+        streamEvent(textDelta('lo')),
+        streamEvent(textDelta('sub'), 'tu1'),
+      );
+
+      expect(await run()).toEqual([
+        { type: 'text_delta', text: 'Hel' },
+        { type: 'text_delta', text: 'lo' },
+      ]);
+    });
+
     it('maps assistant text and tool_use blocks, ignoring other blocks', async () => {
       streamMessages(
         assistant(
@@ -202,6 +235,23 @@ describe('ClaudeAgentSdkProvider', () => {
       expect(await run()).toEqual([
         { type: 'done', text: 'final answer', turns: 3, durationMs: expect.any(Number) as number },
       ]);
+    });
+
+    it('maps a "success" result flagged is_error (e.g. invalid token) to an error', async () => {
+      warnLog.mockClear();
+      streamMessages(
+        {
+          type: 'assistant',
+          error: 'authentication_failed',
+          message: { content: [{ type: 'text', text: 'Failed to authenticate.' }] },
+        },
+        { ...success('Failed to authenticate. API Error: 401'), is_error: true },
+      );
+
+      expect(await run()).toEqual([
+        { type: 'error', message: 'Failed to authenticate. API Error: 401' },
+      ]);
+      expect(warnLog).toHaveBeenCalled();
     });
 
     it('maps an error result to an error event', async () => {

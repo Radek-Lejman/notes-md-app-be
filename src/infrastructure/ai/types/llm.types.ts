@@ -1,3 +1,5 @@
+import type { AiAuth } from './auth.types';
+
 /**
  * Provider-agnostic LLM contract. Feature modules depend ONLY on this file
  * (via the LLM_PROVIDER token) — never on a concrete adapter.
@@ -12,6 +14,8 @@ export interface LlmCompletionRequest {
   systemPrompt?: string;
   /** Overrides the provider's default model. */
   model?: string;
+  /** Account to run on; defaults to the server login. */
+  auth?: AiAuth;
 }
 
 export interface LlmCompletionResult {
@@ -23,5 +27,7 @@ export interface LlmCompletionResult {
 
 export interface LlmProvider {
   readonly name: LlmProviderName;
+  /** True when requests are billed to a user account (Claude), so `auth` matters. */
+  readonly usesAccountAuth: boolean;
   complete(request: LlmCompletionRequest): Promise<LlmCompletionResult>;
 }

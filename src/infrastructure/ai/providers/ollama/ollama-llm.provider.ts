@@ -5,6 +5,7 @@ import { OllamaMessage } from './ollama.types';
 /** Simple completion against a local Ollama model. No subscription/API costs. */
 export class OllamaLlmProvider implements LlmProvider {
   readonly name = 'ollama' as const;
+  readonly usesAccountAuth = false;
 
   constructor(private readonly client: OllamaClient) {}
 

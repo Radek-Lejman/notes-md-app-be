@@ -5,20 +5,21 @@ import { AgentEvent, AgentProvider, AgentRunRequest, AgentTool } from '../../typ
 import { ClaudeAgentSdkConfig } from '../../config/ai.config';
 import { LlmProviderError } from '../../errors/llm-provider.error';
 import { runAgentTool } from '../../tools/run-agent-tool';
+import { prepareClaudeEnv } from '../claude-auth';
 
 const MCP_SERVER_NAME = 'app';
 const MCP_TOOL_PREFIX = `mcp__${MCP_SERVER_NAME}__`;
 
 /**
  * Agent loop via Claude Agent SDK (the engine behind Claude Code).
- * Auth comes from the local Claude login, so runs count against the Pro/Max
- * subscription. Dev/POC only — a multi-user product needs API-key auth.
+ * Auth per run (see prepareClaudeEnv): the user's own token/API key, or the host login.
  *
  * App tools are exposed as an in-process MCP server; all built-in Claude Code
  * tools (Bash, Read, Edit, WebFetch...) are disabled.
  */
 export class ClaudeAgentSdkProvider implements AgentProvider {
   readonly name = 'claude-agent-sdk' as const;
+  readonly usesAccountAuth = true;
   private readonly logger = new Logger(ClaudeAgentSdkProvider.name);
 
   constructor(private readonly config: ClaudeAgentSdkConfig) {}
@@ -28,9 +29,7 @@ export class ClaudeAgentSdkProvider implements AgentProvider {
     const toolNamesById = new Map<string, string>();
     const startedAt = Date.now();
 
-    // Drop API key so the SDK uses the subscription login, not pay-as-you-go API billing.
-    const env = { ...process.env };
-    delete env.ANTHROPIC_API_KEY;
+    const { env, cleanup } = await prepareClaudeEnv(request.auth);
 
     const stream = query({
       prompt: request.task,
@@ -47,6 +46,7 @@ export class ClaudeAgentSdkProvider implements AgentProvider {
         strictMcpConfig: true,
         settingSources: [],
         persistSession: false,
+        includePartialMessages: true,
       },
     });
 
@@ -63,6 +63,7 @@ export class ClaudeAgentSdkProvider implements AgentProvider {
       throw new LlmProviderError(this.name, (e as Error).message);
     } finally {
       abortController.abort();
+      await cleanup();
     }
   }
 
@@ -85,7 +86,22 @@ export class ClaudeAgentSdkProvider implements AgentProvider {
     startedAt: number,
   ): Iterable<AgentEvent> {
     switch (message.type) {
+      case 'stream_event': {
+        const { event } = message;
+        if (
+          message.parent_tool_use_id === null &&
+          event.type === 'content_block_delta' &&
+          event.delta.type === 'text_delta'
+        ) {
+          yield { type: 'text_delta', text: event.delta.text };
+        }
+        return;
+      }
+
       case 'assistant':
+        // API failures (e.g. invalid token) come as an assistant message with `error` set;
+        // its text is an error description, not an answer — the result reports it.
+        if (message.error) return;
         for (const block of message.message.content) {
           if (block.type === 'text') {
             yield { type: 'text', text: block.text };
@@ -113,7 +129,11 @@ export class ClaudeAgentSdkProvider implements AgentProvider {
       }
 
       case 'result':
-        if (message.subtype === 'success') {
+        // A run can end with subtype "success" and still be an error (e.g. 401 from the API).
+        if (message.subtype === 'success' && message.is_error) {
+          this.logger.warn(`Agent run failed: ${message.result}`);
+          yield { type: 'error', message: message.result || 'Agent failed' };
+        } else if (message.subtype === 'success') {
           yield {
             type: 'done',
             text: message.result,
