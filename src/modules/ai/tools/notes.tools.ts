@@ -4,6 +4,7 @@ import { UserNotesService } from 'src/modules/notes/service/userNotes.service';
 import { GetNoteQueryDto } from 'src/modules/notes/dto/getNoteQuery.dto';
 import { SearchNotesQueryDto } from 'src/modules/notes/dto/searchNotesQueryDto';
 import { Note } from 'src/modules/notes/interfaces/notes.interface';
+import { RagHit } from '../rag/rag.types';
 import { AGENT_LIST_LIMIT, AGENT_NOTE_MAX_CHARS, AGENT_SEARCH_LIMIT } from '../consts/ai.consts';
 
 export interface NoteRef {
@@ -12,8 +13,10 @@ export interface NoteRef {
 }
 
 export interface NotesToolsOptions {
-  /** Called for every note the agent reads (get_note), e.g. for sources. */
+  /** Called for every note the agent reads (get_note, semantic_search hits), e.g. for sources. */
   onNoteRead?: (note: NoteRef) => void;
+  /** Adds the semantic_search tool (RAG), already bound to the user. */
+  semanticSearch?: (query: string) => Promise<RagHit[]>;
 }
 
 /**
@@ -75,6 +78,31 @@ export function createNotesTools(
       },
     }),
   ];
+
+  const { semanticSearch } = options;
+  if (semanticSearch) {
+    tools.push(
+      defineAgentTool({
+        name: 'semantic_search',
+        description:
+          "Semantic search in the user's notes: finds fragments by meaning (synonyms, other " +
+          'languages, paraphrases). Returns noteId, title, section, the fragment text and a ' +
+          'relevance score (0-1). Use get_note for the full note.',
+        inputSchema: { query: z.string().min(2).describe('Question or topic to look for') },
+        handler: async ({ query }) => {
+          const hits = await semanticSearch(query);
+          hits.forEach((hit) => options.onNoteRead?.({ id: hit.noteId, title: hit.title }));
+          return hits.map((hit) => ({
+            noteId: hit.noteId,
+            title: hit.title,
+            section: hit.headingPath,
+            fragment: hit.content,
+            score: Math.round(hit.score * 100) / 100,
+          }));
+        },
+      }),
+    );
+  }
 
   return tools;
 }
