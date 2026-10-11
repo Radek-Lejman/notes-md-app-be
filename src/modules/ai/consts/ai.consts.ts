@@ -24,5 +24,30 @@ export const AGENT_SYSTEM_PROMPT = [
 ].join('\n');
 export const AGENT_LIST_LIMIT = 200;
 
+// Chat
+export const AI_CHAT_THROTTLE = {
+  global: { ttl: ms('1m'), limit: () => aiModuleConfig().limits.chatPerMinute },
+};
 // Saving/testing credentials: a test call costs quota, saving is a brute-force surface.
 export const AI_CREDENTIALS_THROTTLE = { global: { ttl: ms('1m'), limit: 5 } };
+export const MAX_CHAT_MESSAGES = 20;
+/** Per message; assistant answers in the history can be longer than a prompt. */
+export const MAX_CHAT_MESSAGE_LENGTH = 20_000;
+/** Older messages are dropped from the task once the history exceeds this budget. */
+export const CHAT_HISTORY_MAX_CHARS = 40_000;
+export const CHAT_NOTE_CONTEXT_MAX_CHARS = 12_000;
+
+export const CHAT_SYSTEM_PROMPT = [
+  AGENT_SYSTEM_PROMPT,
+  'The user chats with you from inside one of their notes (the current note, if given below).',
+  '"This note" and similar phrases refer to the current note.',
+  'When the question needs knowledge beyond the current note, search the other notes.',
+  'When you rely on a note, mention its title.',
+].join('\n');
+
+export const CHAT_RAG_PROMPT = [
+  'Use semantic_search for questions in natural language (it matches meaning, synonyms and',
+  'other languages); use search_notes for exact words or names.',
+  'Fragments of other notes found for the question may be given below. They can be incomplete:',
+  'use get_note for the full note when needed, and ignore fragments that are not relevant.',
+].join('\n');

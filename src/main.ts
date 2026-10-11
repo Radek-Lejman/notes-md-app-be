@@ -3,9 +3,12 @@ import { AppModule } from './app.module';
 import cookieParser from 'cookie-parser';
 import { corsConfig, csrfMiddleware, helmetConfig, hstsConfig } from '@security';
 import { ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { cors: false });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { cors: false });
+  // Express defaults to 100kb; a full AI chat (MAX_CHAT_MESSAGES x MAX_CHAT_MESSAGE_LENGTH) needs more.
+  app.useBodyParser('json', { limit: '2mb' });
   app.setGlobalPrefix('api');
   app.use(cookieParser());
   app.use(csrfMiddleware);

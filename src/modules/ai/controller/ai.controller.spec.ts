@@ -1,18 +1,35 @@
-import { HttpStatus, Logger } from '@nestjs/common';
+import { ForbiddenException, HttpStatus, Logger } from '@nestjs/common';
 import { Response } from 'express';
-import { AgentEvent } from '@ai';
+import { AgentEvent, AiAuth } from '@ai';
 import { streamOf } from '@ai/testing/ai-test.utils';
 import { AuthUser } from '@security';
 import { AiController } from './ai.controller';
 import { AiService } from '../service/ai.service';
 import { AiAgentService } from '../service/aiAgent.service';
+import { AiChatService } from '../service/aiChat.service';
+import { AiCredentialsService } from '../credentials/aiCredentials.service';
+import { AiRunLimiter } from '../credentials/aiRunLimiter.service';
+import { ChatDto } from '../dto/chat.dto';
+import { ChatEvent } from '../types/chat.types';
 
 describe('AiController', () => {
+  const auth: AiAuth = { kind: 'claude-oauth-token', token: 'tok' };
   const complete = jest.fn<ReturnType<AiService['complete']>, Parameters<AiService['complete']>>();
   const run = jest.fn<AsyncIterable<AgentEvent>, Parameters<AiAgentService['run']>>();
+  const chat = jest.fn<ReturnType<AiChatService['chat']>, Parameters<AiChatService['chat']>>();
+  const authForAgent = jest.fn<Promise<AiAuth>, [string]>();
+  const authForLlm = jest.fn<Promise<AiAuth>, [string]>();
+  const release = jest.fn();
+  const acquire = jest.fn<() => void, [string]>();
+  const limiter = { acquire } as unknown as AiRunLimiter;
+  limiter.run = AiRunLimiter.prototype.run.bind(limiter) as AiRunLimiter['run'];
+
   const controller = new AiController(
     { complete } as unknown as AiService,
     { run } as unknown as AiAgentService,
+    { chat } as unknown as AiChatService,
+    { authForAgent, authForLlm } as unknown as AiCredentialsService,
+    limiter,
   );
   const user = { sub: 'user-1' } as AuthUser;
 
@@ -34,24 +51,28 @@ describe('AiController', () => {
   const streamEvents = (...events: AgentEvent[]) =>
     run.mockImplementation(() => streamOf(...events));
 
-  const sse = (event: AgentEvent) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
+  const sse = (event: ChatEvent) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
 
   let errorLog: jest.SpyInstance;
 
   beforeEach(() => {
-    complete.mockReset();
-    run.mockReset();
+    jest.clearAllMocks();
+    authForAgent.mockResolvedValue(auth);
+    authForLlm.mockResolvedValue(auth);
+    acquire.mockReturnValue(release);
     errorLog = jest.spyOn(Logger.prototype, 'error').mockImplementation();
   });
 
   afterEach(() => jest.restoreAllMocks());
 
-  it('complete: delegates to AiService with the current user', async () => {
+  it('complete: runs on the user account inside a limiter slot', async () => {
     const result = { text: 'a', provider: 'ollama' as const, durationMs: 1 };
     complete.mockResolvedValue(result);
 
     await expect(controller.complete({ prompt: 'hi' }, user)).resolves.toBe(result);
-    expect(complete).toHaveBeenCalledWith('hi', 'user-1');
+    expect(complete).toHaveBeenCalledWith('hi', 'user-1', auth);
+    expect(acquire).toHaveBeenCalledWith('user-1');
+    expect(release).toHaveBeenCalledTimes(1);
   });
 
   it('agent: streams events as SSE and ends the response', async () => {
@@ -71,16 +92,17 @@ describe('AiController', () => {
     expect(res.flushHeaders).toHaveBeenCalled();
     expect(res.write.mock.calls.map(([chunk]) => chunk)).toEqual(events.map(sse));
     expect(res.end).toHaveBeenCalledTimes(1);
+    expect(release).toHaveBeenCalledTimes(1);
   });
 
-  it('agent: passes task, user and an abort signal that fires on client disconnect', async () => {
+  it('agent: passes task, user, auth and an abort signal that fires on client disconnect', async () => {
     streamEvents();
     const { handlers, asResponse } = makeRes();
 
     await controller.runAgent({ task: 'task' }, user, asResponse);
 
-    const [task, userId, signal] = run.mock.calls[0];
-    expect([task, userId]).toEqual(['task', 'user-1']);
+    const [task, userId, signal, passedAuth] = run.mock.calls[0];
+    expect([task, userId, passedAuth]).toEqual(['task', 'user-1', auth]);
     expect(signal?.aborted).toBe(false);
     handlers.close();
     expect(signal?.aborted).toBe(true);
@@ -102,6 +124,7 @@ describe('AiController', () => {
     ]);
     expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('provider down'));
     expect(res.end).toHaveBeenCalledTimes(1);
+    expect(release).toHaveBeenCalledTimes(1);
   });
 
   it('agent: only ends the response when there are no events', async () => {
@@ -112,5 +135,70 @@ describe('AiController', () => {
 
     expect(res.write).not.toHaveBeenCalled();
     expect(res.end).toHaveBeenCalledTimes(1);
+  });
+
+  describe('chat', () => {
+    const dto: ChatDto = { messages: [{ role: 'user', content: 'hi' }], noteId: 'n1' };
+
+    it('streams chat events (incl. sources) as SSE', async () => {
+      const events: ChatEvent[] = [
+        { type: 'text_delta', text: 'an' },
+        { type: 'sources', notes: [{ id: 'n1', title: 'TS' }] },
+        { type: 'done', text: 'answer', turns: 1, durationMs: 1 },
+      ];
+      chat.mockResolvedValue(streamOf(...events));
+      const { res, asResponse } = makeRes();
+
+      await controller.chat(dto, user, asResponse);
+
+      expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'text/event-stream');
+      expect(res.write.mock.calls.map(([chunk]) => chunk)).toEqual(events.map(sse));
+      expect(res.end).toHaveBeenCalledTimes(1);
+      expect(release).toHaveBeenCalledTimes(1);
+    });
+
+    it('passes dto, user, auth and an abort signal that fires on client disconnect', async () => {
+      chat.mockResolvedValue(streamOf());
+      const { handlers, asResponse } = makeRes();
+
+      await controller.chat(dto, user, asResponse);
+
+      const [passedDto, userId, passedAuth, signal] = chat.mock.calls[0];
+      expect([passedDto, userId, passedAuth]).toEqual([dto, 'user-1', auth]);
+      handlers.close();
+      expect(signal?.aborted).toBe(true);
+    });
+
+    it('rejects with 403 before taking a slot when the user has no AI account', async () => {
+      authForAgent.mockRejectedValue(new ForbiddenException());
+      const { res, asResponse } = makeRes();
+
+      await expect(controller.chat(dto, user, asResponse)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      expect(acquire).not.toHaveBeenCalled();
+      expect(chat).not.toHaveBeenCalled();
+      expect(res.flushHeaders).not.toHaveBeenCalled();
+    });
+
+    it('rejects before opening the stream and frees the slot when the service fails', async () => {
+      chat.mockRejectedValue(new Error('Note n1 not found'));
+      const { res, asResponse } = makeRes();
+
+      await expect(controller.chat(dto, user, asResponse)).rejects.toThrow('Note n1 not found');
+      expect(res.flushHeaders).not.toHaveBeenCalled();
+      expect(res.write).not.toHaveBeenCalled();
+      expect(release).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not run when the limiter refuses a slot', async () => {
+      acquire.mockImplementation(() => {
+        throw new Error('busy');
+      });
+      const { asResponse } = makeRes();
+
+      await expect(controller.chat(dto, user, asResponse)).rejects.toThrow('busy');
+      expect(chat).not.toHaveBeenCalled();
+    });
   });
 });
