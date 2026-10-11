@@ -12,6 +12,10 @@ const AI_ENV_KEYS = [
   'AI_OLLAMA_MODEL',
   'AI_OLLAMA_THINK',
   'AI_OLLAMA_TIMEOUT_MS',
+  'RAG_EMBEDDING_PROVIDER',
+  'RAG_OLLAMA_URL',
+  'RAG_EMBEDDING_MODEL',
+  'RAG_EMBEDDING_TIMEOUT_MS',
 ];
 
 describe('loadAiConfig', () => {
@@ -30,6 +34,7 @@ describe('loadAiConfig', () => {
     expect(loadAiConfig()).toEqual({
       llmProvider: 'claude-cli',
       agentProvider: 'claude-agent-sdk',
+      embeddingProvider: 'ollama',
       providers: {
         'claude-cli': { bin: 'claude', model: 'sonnet', timeoutMs: 90_000 },
         'claude-agent-sdk': { model: 'sonnet', maxTurns: 8, timeoutMs: 180_000 },
@@ -39,6 +44,11 @@ describe('loadAiConfig', () => {
           think: undefined,
           timeoutMs: 180_000,
           maxTurns: 8,
+        },
+        'ollama-embedding': {
+          baseUrl: 'http://localhost:11434',
+          model: 'bge-m3',
+          timeoutMs: 60_000,
         },
       },
     });
@@ -57,11 +67,15 @@ describe('loadAiConfig', () => {
       AI_OLLAMA_MODEL: 'llama3.2',
       AI_OLLAMA_THINK: 'true',
       AI_OLLAMA_TIMEOUT_MS: '7000',
+      RAG_OLLAMA_URL: 'http://embed:2',
+      RAG_EMBEDDING_MODEL: 'nomic-embed-text',
+      RAG_EMBEDDING_TIMEOUT_MS: '8000',
     });
 
     expect(loadAiConfig()).toEqual({
       llmProvider: 'ollama',
       agentProvider: 'ollama',
+      embeddingProvider: 'ollama',
       providers: {
         'claude-cli': { bin: '/bin/claude', model: 'opus', timeoutMs: 5000 },
         'claude-agent-sdk': { model: 'opus', maxTurns: 3, timeoutMs: 6000 },
@@ -72,8 +86,18 @@ describe('loadAiConfig', () => {
           timeoutMs: 7000,
           maxTurns: 3,
         },
+        'ollama-embedding': {
+          baseUrl: 'http://embed:2',
+          model: 'nomic-embed-text',
+          timeoutMs: 8000,
+        },
       },
     });
+  });
+
+  it('uses AI_OLLAMA_URL for embeddings when RAG_OLLAMA_URL is not set', () => {
+    process.env.AI_OLLAMA_URL = 'http://host:1';
+    expect(loadAiConfig().providers['ollama-embedding'].baseUrl).toBe('http://host:1');
   });
 
   it('parses AI_OLLAMA_THINK=false', () => {

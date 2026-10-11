@@ -8,10 +8,12 @@ export function makeAiConfig(
   return {
     llmProvider: 'claude-cli',
     agentProvider: 'claude-agent-sdk',
+    embeddingProvider: 'ollama',
     providers: {
       'claude-cli': { bin: 'claude', model: 'sonnet', timeoutMs: 1000 },
       'claude-agent-sdk': { model: 'sonnet', maxTurns: 5, timeoutMs: 1000 },
       ollama: { baseUrl: 'http://ollama', model: 'qwen', timeoutMs: 1000, maxTurns: 5 },
+      'ollama-embedding': { baseUrl: 'http://ollama', model: 'bge-m3', timeoutMs: 1000 },
     },
     ...overrides,
   };

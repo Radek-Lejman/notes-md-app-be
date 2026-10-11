@@ -43,6 +43,13 @@ services:
       - "3000:3000"
     env_file:
       - .env
+    environment:
+      # Ollama (RAG embeddings / local models) runs on the host, not in this container.
+      # Override with AI_OLLAMA_URL_DOCKER in .env (e.g. a remote Ollama).
+      AI_OLLAMA_URL: ${AI_OLLAMA_URL_DOCKER:-http://host.docker.internal:11434}
+    extra_hosts:
+      # Makes host.docker.internal resolve on Linux too (built in on Docker Desktop).
+      - "host.docker.internal:host-gateway"
     depends_on:
       db:
         condition: service_healthy
