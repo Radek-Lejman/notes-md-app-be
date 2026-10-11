@@ -74,6 +74,14 @@ describe('chunkMarkdown', () => {
     expect(chunks[1].content.startsWith(chunks[0].content.slice(-options.chunkOverlap))).toBe(true);
   });
 
+  it('starts each chunk with a fresh paragraph when overlap is 0', () => {
+    const paragraphs = Array.from({ length: 6 }, (_, i) => `P${i} ${'x'.repeat(70)}`);
+    const chunks = chunkMarkdown('T', paragraphs.join('\n\n'), { ...options, chunkOverlap: 0 });
+
+    expect(chunks.length).toBeGreaterThan(1);
+    chunks.forEach((c) => expect(c.content).toMatch(/^P\d /));
+  });
+
   it('hard-splits a paragraph longer than chunkSize', () => {
     const chunks = chunkMarkdown('T', 'y'.repeat(450), options);
     chunks.forEach((c) => expect(c.content.length).toBeLessThanOrEqual(options.chunkSize));

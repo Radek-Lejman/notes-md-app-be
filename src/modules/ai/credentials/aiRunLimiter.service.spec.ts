@@ -28,6 +28,27 @@ describe('AiRunLimiter', () => {
     expect(() => limiter.acquire('carol')).toThrow('busy');
   });
 
+  it('frees one slot at a time when a user holds several', () => {
+    const limiter = makeLimiter(5, 2);
+    const first = limiter.acquire('alice');
+    limiter.acquire('alice');
+    expect(() => limiter.acquire('alice')).toThrow('still running');
+
+    first();
+    expect(() => limiter.acquire('alice')).not.toThrow();
+    expect(() => limiter.acquire('alice')).toThrow('still running');
+  });
+
+  it('never leaves a negative per-user count, even if the entry is already gone', () => {
+    const limiter = makeLimiter(5, 1);
+    const release = limiter.acquire('alice');
+    limiter['perUser'].clear();
+
+    release();
+    expect(limiter['perUser'].has('alice')).toBe(false);
+    expect(() => limiter.acquire('alice')).not.toThrow();
+  });
+
   it('ignores a double release', () => {
     const limiter = makeLimiter(1, 1);
     const release = limiter.acquire('alice');

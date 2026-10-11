@@ -36,6 +36,23 @@ describe('OllamaEmbeddingProvider', () => {
     expect(JSON.parse(init.body as string)).toEqual({ model: 'bge-m3', input: ['a', 'b'] });
   });
 
+  it('aborts the request when the caller aborts', async () => {
+    fetchMock.mockImplementation(
+      (_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) =>
+          init.signal?.addEventListener('abort', () => reject(init.signal?.reason as Error)),
+        ),
+    );
+    const controller = new AbortController();
+
+    const pending = provider.embed(['a'], controller.signal).catch((e: unknown) => e);
+    controller.abort(new DOMException('client gone', 'AbortError'));
+
+    const error = await pending;
+    expect(error).toBeInstanceOf(LlmProviderError);
+    expect((error as Error).message).toContain('client gone');
+  });
+
   it('skips the request for an empty batch', async () => {
     await expect(provider.embed([])).resolves.toEqual([]);
     expect(fetchMock).not.toHaveBeenCalled();

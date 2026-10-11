@@ -254,6 +254,11 @@ describe('ClaudeAgentSdkProvider', () => {
       expect(warnLog).toHaveBeenCalled();
     });
 
+    it('falls back to a generic message for an is_error result without text', async () => {
+      streamMessages({ ...success(''), is_error: true });
+      expect(await run()).toEqual([{ type: 'error', message: 'Agent failed' }]);
+    });
+
     it('maps an error result to an error event', async () => {
       streamMessages({ type: 'result', subtype: 'error_max_turns' });
       expect(await run()).toEqual([{ type: 'error', message: 'Agent stopped: error_max_turns' }]);

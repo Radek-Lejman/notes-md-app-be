@@ -121,4 +121,126 @@ describe('RagIndexerService', () => {
       jest.useRealTimers();
     }
   });
+
+  it('skips a round while the previous one is still running', async () => {
+    let finish: (notes: NoteToIndex[]) => void = () => undefined;
+    repository.findNotesToIndex.mockReturnValueOnce(
+      new Promise<NoteToIndex[]>((resolve) => (finish = resolve)),
+    );
+
+    const first = service.indexPending();
+    await expect(service.indexPending()).resolves.toBe(0);
+    expect(repository.findNotesToIndex).toHaveBeenCalledTimes(1);
+
+    finish([]);
+    await expect(first).resolves.toBe(0);
+  });
+
+  it('logs a paused provider once and the recovery once', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+    repository.findNotesToIndex.mockRejectedValue(new Error('ECONNREFUSED'));
+
+    await service.indexPending();
+    await service.indexPending();
+    expect(warn).toHaveBeenCalledTimes(1);
+
+    repository.findNotesToIndex.mockResolvedValue([]);
+    await service.indexPending();
+    await service.indexPending();
+    expect(log.mock.calls.filter(([m]) => m === 'RAG indexing recovered')).toHaveLength(1);
+  });
+
+  it('embeds large notes in batches of 32 chunks', async () => {
+    const sections = Array.from({ length: 40 }, (_, i) => `# S${i}\ntext ${i}`).join('\n');
+    repository.findNotesToIndex.mockResolvedValue([{ ...note, content: sections }]);
+
+    await service.indexPending();
+
+    expect(embed.mock.calls.map(([texts]) => texts.length)).toEqual([32, 8]);
+    const [, , chunks] = repository.replaceChunks.mock.calls[0] as [unknown, unknown, unknown[]];
+    expect(chunks).toHaveLength(40);
+  });
+
+  describe('lifecycle', () => {
+    beforeEach(() => {
+      jest.useFakeTimers({ doNotFake: ['nextTick'] });
+      repository.findNotesToIndex.mockResolvedValue([]);
+      repository.invalidateOtherModels.mockResolvedValue(0);
+    });
+
+    afterEach(() => {
+      service.onModuleDestroy();
+      jest.useRealTimers();
+    });
+
+    const flush = async () => {
+      for (let i = 0; i < 5; i++) await Promise.resolve();
+    };
+
+    it('does nothing when RAG is disabled', async () => {
+      const disabled = new RagIndexerService(
+        { rag: { ...config.rag, enabled: false } } as AiModuleConfig,
+        { model: 'bge-m3', embed } as unknown as EmbeddingProvider,
+        repository as unknown as RagRepository,
+      );
+
+      await disabled.onModuleInit();
+      await jest.advanceTimersByTimeAsync(60_000);
+
+      expect(repository.invalidateOtherModels).not.toHaveBeenCalled();
+      expect(repository.findNotesToIndex).not.toHaveBeenCalled();
+    });
+
+    it('re-indexes notes of another embedding model, then indexes on an interval', async () => {
+      repository.invalidateOtherModels.mockResolvedValue(3);
+
+      await service.onModuleInit();
+      expect(repository.invalidateOtherModels).toHaveBeenCalledWith('bge-m3');
+      expect(repository.findNotesToIndex).not.toHaveBeenCalled();
+
+      await jest.advanceTimersByTimeAsync(1_000);
+      await flush();
+      expect(repository.findNotesToIndex).toHaveBeenCalledTimes(1);
+
+      await jest.advanceTimersByTimeAsync(30_000);
+      await flush();
+      expect(repository.findNotesToIndex).toHaveBeenCalledTimes(2);
+    });
+
+    it('still starts indexing when the start-up invalidation fails', async () => {
+      const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+      repository.invalidateOtherModels.mockRejectedValue(new Error('relation does not exist'));
+
+      await service.onModuleInit();
+      await jest.advanceTimersByTimeAsync(1_000);
+
+      expect(error).toHaveBeenCalledWith('RAG init failed: relation does not exist');
+      expect(repository.findNotesToIndex).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops scheduling rounds after module destroy', async () => {
+      await service.onModuleInit();
+      service.onModuleDestroy();
+
+      await jest.advanceTimersByTimeAsync(120_000);
+      expect(repository.findNotesToIndex).not.toHaveBeenCalled();
+    });
+
+    it('does not schedule the next round when destroyed during a running round', async () => {
+      let finish: (notes: NoteToIndex[]) => void = () => undefined;
+      repository.findNotesToIndex.mockReturnValueOnce(
+        new Promise<NoteToIndex[]>((resolve) => (finish = resolve)),
+      );
+
+      await service.onModuleInit();
+      await jest.advanceTimersByTimeAsync(1_000);
+      service.onModuleDestroy();
+      finish([]);
+      await flush();
+
+      await jest.advanceTimersByTimeAsync(120_000);
+      expect(repository.findNotesToIndex).toHaveBeenCalledTimes(1);
+    });
+  });
 });

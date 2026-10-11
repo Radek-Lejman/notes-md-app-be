@@ -99,6 +99,9 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node",
+    "setupFiles": [
+      "<rootDir>/../test/unit-env.setup.ts"
+    ],
     "moduleNameMapper": {
       "^@ai(.*)$": "<rootDir>/infrastructure/ai$1",
       "^@core(.*)$": "<rootDir>/core$1",

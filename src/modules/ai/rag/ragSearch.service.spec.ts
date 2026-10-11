@@ -8,11 +8,12 @@ import { AiModuleConfig } from '../config/aiModule.config';
 describe('RagSearchService', () => {
   const embed = jest.fn<Promise<number[][]>, [string[]]>();
   const search = jest.fn<Promise<RagHit[]>, [string, string, number[], number]>();
+  const stats = jest.fn();
   const makeService = (enabled = true) =>
     new RagSearchService(
       { rag: { enabled, topK: 5, minScore: 0.5 } } as AiModuleConfig,
       { model: 'bge-m3', embed } as unknown as EmbeddingProvider,
-      { search } as unknown as RagRepository,
+      { search, stats } as unknown as RagRepository,
     );
   const hit = (score: number) => ({
     noteId: 'n',
@@ -43,5 +44,27 @@ describe('RagSearchService', () => {
     jest.spyOn(Logger.prototype, 'warn').mockImplementation();
     embed.mockRejectedValue(new Error('ollama down'));
     await expect(makeService().searchSafe('user-1', 'deploy')).resolves.toEqual([]);
+  });
+
+  it('exposes the embedding model and whether RAG is enabled', () => {
+    expect(makeService().model).toBe('bge-m3');
+    expect(makeService().enabled).toBe(true);
+    expect(makeService(false).enabled).toBe(false);
+  });
+
+  it('uses the configured topK by default and an explicit limit when given', async () => {
+    await makeService().search('user-1', 'deploy');
+    await makeService().searchSafe('user-1', 'deploy', 2);
+    expect(search.mock.calls.map((call) => call[3])).toEqual([5, 2]);
+  });
+
+  it("stats are counted for the user's chunks of the current model", async () => {
+    stats.mockResolvedValue({ totalNotes: 1, indexedNotes: 1, chunks: 2 });
+    await expect(makeService().stats('user-1')).resolves.toEqual({
+      totalNotes: 1,
+      indexedNotes: 1,
+      chunks: 2,
+    });
+    expect(stats).toHaveBeenCalledWith('user-1', 'bge-m3');
   });
 });

@@ -119,6 +119,42 @@ describe('AiCredentialsService', () => {
     expect(aiCredential.findUnique).not.toHaveBeenCalled();
   });
 
+  it('agentNeedsAccount reflects the agent provider', () => {
+    expect(makeService().agentNeedsAccount).toBe(true);
+  });
+
+  describe('canUseServerLogin', () => {
+    it('is off without an allow-list, without querying the user', async () => {
+      await expect(makeService().canUseServerLogin('user-1')).resolves.toBe(false);
+      expect(user.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('is off for a user that does not exist', async () => {
+      user.findUnique.mockResolvedValue(null);
+      await expect(makeService(['me@example.com']).canUseServerLogin('ghost')).resolves.toBe(false);
+    });
+  });
+
+  describe('getStatus', () => {
+    it('returns the type, hint and date of a saved credential', async () => {
+      const updatedAt = new Date('2026-01-01');
+      aiCredential.findUnique.mockResolvedValue({
+        type: 'anthropic-api-key',
+        hint: '…1234',
+        updatedAt,
+      });
+      await expect(makeService().getStatus('user-1')).resolves.toEqual({
+        type: 'anthropic-api-key',
+        hint: '…1234',
+        updatedAt,
+      });
+    });
+
+    it('returns null when nothing is saved', async () => {
+      await expect(makeService().getStatus('user-1')).resolves.toBeNull();
+    });
+  });
+
   it('getStatus never selects the secret', async () => {
     await makeService().getStatus('user-1');
     expect(aiCredential.findUnique).toHaveBeenCalledWith({
