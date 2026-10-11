@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { AGENT_PROVIDER, AgentEvent, AgentProvider } from '@ai';
+import { AGENT_PROVIDER, AgentEvent, AgentProvider, AiAuth } from '@ai';
 import { UserNotesService } from 'src/modules/notes/service/userNotes.service';
 import { createNotesTools } from '../tools/notes.tools';
 import { AGENT_SYSTEM_PROMPT } from '../consts/ai.consts';
@@ -17,14 +17,22 @@ export class AiAgentService {
     private readonly userNotesService: UserNotesService,
   ) {}
 
-  async *run(task: string, userId: string, signal?: AbortSignal): AsyncIterable<AgentEvent> {
-    this.logger.log(`user=${userId} provider=${this.agent.name} agent run started`);
+  async *run(
+    task: string,
+    userId: string,
+    signal?: AbortSignal,
+    auth?: AiAuth,
+  ): AsyncIterable<AgentEvent> {
+    this.logger.log(
+      `user=${userId} provider=${this.agent.name} auth=${auth?.kind ?? 'server'} agent run started`,
+    );
 
     yield* this.agent.run({
       task,
       systemPrompt: AGENT_SYSTEM_PROMPT,
       tools: createNotesTools(this.userNotesService, userId),
       signal,
+      auth,
     });
   }
 }

@@ -1,9 +1,13 @@
 import ms from 'ms';
+import { aiModuleConfig } from '../config/aiModule.config';
 
 export const MAX_PROMPT_LENGTH = 8_000;
 
 // Every call spawns a CLI process and burns subscription quota — keep it tight.
-export const AI_THROTTLE = { global: { ttl: ms('1m'), limit: 5 } };
+// Limits are functions so they are read from env (AI_RATE_LIMIT_PER_MIN) after .env is loaded.
+export const AI_THROTTLE = {
+  global: { ttl: ms('1m'), limit: () => aiModuleConfig().limits.completePerMinute },
+};
 
 export const DEFAULT_SYSTEM_PROMPT =
   'You are an assistant inside a markdown note-taking app. Answer concisely in the language of the user.';
@@ -19,3 +23,6 @@ export const AGENT_SYSTEM_PROMPT = [
   'Answer concisely in the language of the user, in markdown.',
 ].join('\n');
 export const AGENT_LIST_LIMIT = 200;
+
+// Saving/testing credentials: a test call costs quota, saving is a brute-force surface.
+export const AI_CREDENTIALS_THROTTLE = { global: { ttl: ms('1m'), limit: 5 } };

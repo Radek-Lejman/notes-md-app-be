@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { LLM_PROVIDER, LlmProvider } from '@ai';
+import { AiAuth, LLM_PROVIDER, LlmProvider } from '@ai';
 import { CompleteResponseDto } from '../dto/complete.dto';
 import { DEFAULT_SYSTEM_PROMPT } from '../consts/ai.consts';
 
@@ -13,8 +13,8 @@ export class AiService {
 
   constructor(@Inject(LLM_PROVIDER) private readonly llm: LlmProvider) {}
 
-  async complete(prompt: string, userId: string): Promise<CompleteResponseDto> {
-    const result = await this.llm.complete({ prompt, systemPrompt: DEFAULT_SYSTEM_PROMPT });
+  async complete(prompt: string, userId: string, auth?: AiAuth): Promise<CompleteResponseDto> {
+    const result = await this.llm.complete({ prompt, systemPrompt: DEFAULT_SYSTEM_PROMPT, auth });
     this.logger.log(
       `user=${userId} provider=${result.provider} model=${result.model} ${result.durationMs}ms`,
     );
