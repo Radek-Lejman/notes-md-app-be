@@ -30,7 +30,7 @@ describe('AiAgentService', () => {
 
     const [request] = run.mock.calls[0];
     expect(request).toMatchObject({ task: 'task', systemPrompt: AGENT_SYSTEM_PROMPT, signal });
-    expect(request.tools.map((t) => t.name)).toEqual(['search_notes', 'get_note']);
+    expect(request.tools.map((t) => t.name)).toEqual(['search_notes', 'get_note', 'list_notes']);
   });
 
   it('passes provider events through unchanged', async () => {

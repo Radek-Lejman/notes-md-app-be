@@ -2,28 +2,34 @@ import { runAgentTool } from '@ai/tools/run-agent-tool';
 import { UserNotesService } from 'src/modules/notes/service/userNotes.service';
 import { SearchNotesQueryDto } from 'src/modules/notes/dto/searchNotesQueryDto';
 import { GetNoteQueryDto } from 'src/modules/notes/dto/getNoteQuery.dto';
-import { createNotesTools } from './notes.tools';
-import { AGENT_NOTE_MAX_CHARS, AGENT_SEARCH_LIMIT } from '../consts/ai.consts';
+import { createNotesTools, NotesToolsOptions } from './notes.tools';
+import { AGENT_LIST_LIMIT, AGENT_NOTE_MAX_CHARS, AGENT_SEARCH_LIMIT } from '../consts/ai.consts';
 
 const MARKDOWN = '# TypeScript\n\n- **Generics** i `infer`\n\n```ts\ntype A<T> = T[];\n```';
 
 describe('createNotesTools', () => {
   const searchByText = jest.fn<Promise<unknown>, Parameters<UserNotesService['searchByText']>>();
   const getNoteById = jest.fn<Promise<unknown>, Parameters<UserNotesService['getNoteById']>>();
-  const notes = { searchByText, getNoteById } as unknown as UserNotesService;
+  const getAllNotes = jest.fn<Promise<unknown>, Parameters<UserNotesService['getAllNotes']>>();
+  const notes = { searchByText, getNoteById, getAllNotes } as unknown as UserNotesService;
 
-  const toolsFor = (userId: string) => {
-    const [search, get] = createNotesTools(notes, userId);
-    return { search, get };
+  const toolsFor = (userId: string, options?: NotesToolsOptions) => {
+    const [search, get, list] = createNotesTools(notes, userId, options);
+    return { search, get, list };
   };
 
   beforeEach(() => {
     searchByText.mockReset().mockResolvedValue([]);
     getNoteById.mockReset();
+    getAllNotes.mockReset().mockResolvedValue([]);
   });
 
-  it('creates search_notes and get_note tools', () => {
-    expect(createNotesTools(notes, 'u1').map((t) => t.name)).toEqual(['search_notes', 'get_note']);
+  it('creates search_notes, get_note and list_notes tools', () => {
+    expect(createNotesTools(notes, 'u1').map((t) => t.name)).toEqual([
+      'search_notes',
+      'get_note',
+      'list_notes',
+    ]);
   });
 
   describe('search_notes', () => {
@@ -73,6 +79,15 @@ describe('createNotesTools', () => {
       expect(result).toEqual({ id: 'n1', title: 'TS', content: MARKDOWN });
     });
 
+    it('reports each read note to onNoteRead', async () => {
+      const onNoteRead = jest.fn();
+      getNoteById.mockResolvedValue({ id: 'n1', title: 'TS', content: MARKDOWN });
+
+      await toolsFor('user-1', { onNoteRead }).get.handler({ id: 'n1' });
+
+      expect(onNoteRead).toHaveBeenCalledWith({ id: 'n1', title: 'TS' });
+    });
+
     it('throws when the note does not exist (or belongs to someone else)', async () => {
       getNoteById.mockResolvedValue(null);
       await expect(toolsFor('user-1').get.handler({ id: 'n1' })).rejects.toThrow(
@@ -105,6 +120,40 @@ describe('createNotesTools', () => {
       await expect(toolsFor('user-1').get.handler({ id: 'n1' })).resolves.toMatchObject({
         content,
       });
+    });
+  });
+
+  describe('list_notes', () => {
+    const note = (id: string, updatedAt: string) => ({
+      id,
+      title: id.toUpperCase(),
+      parentId: null,
+      updatedAt: new Date(updatedAt),
+      userId: 'user-1',
+    });
+
+    it('lists the bound user notes, newest first, without extra fields', async () => {
+      getAllNotes.mockResolvedValue([note('old', '2026-01-01'), note('new', '2026-02-01')]);
+
+      const result = await toolsFor('user-1').list.handler({});
+
+      expect(getAllNotes).toHaveBeenCalledWith('user-1');
+      expect(result).toEqual([
+        { id: 'new', title: 'NEW', parentId: null, updatedAt: new Date('2026-02-01') },
+        { id: 'old', title: 'OLD', parentId: null, updatedAt: new Date('2026-01-01') },
+      ]);
+    });
+
+    it(`returns at most ${AGENT_LIST_LIMIT} notes`, async () => {
+      getAllNotes.mockResolvedValue(
+        Array.from({ length: AGENT_LIST_LIMIT + 5 }, (_, i) => note(`n${i}`, '2026-01-01')),
+      );
+      await expect(toolsFor('user-1').list.handler({})).resolves.toHaveLength(AGENT_LIST_LIMIT);
+    });
+
+    it('returns an empty list when the user has no notes', async () => {
+      getAllNotes.mockResolvedValue(null);
+      await expect(toolsFor('user-1').list.handler({})).resolves.toEqual([]);
     });
   });
 
