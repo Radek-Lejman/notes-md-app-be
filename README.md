@@ -28,7 +28,7 @@ NestJS backend for a Notion-style notes app with unlimited-depth nested pages, f
 ```bash
 npm install
 
-# Create .env (no .env.example in repo — create manually)
+# Create .env — full, commented list of variables (incl. AI/RAG): .env.example
 cat > .env <<'EOF'
 DATABASE_URL=postgresql://user:password@localhost:5432/notes
 JWT_ACCESS_SECRET=your-access-secret
@@ -307,6 +307,55 @@ Both repos share the serialization rules (escaping, hard breaks, code fences, pa
 3. `20261005120100_switch_content_to_markdown` renames `content_md` to `content` (the JSON stays in `content_legacy`) and refuses to run if any row is not backfilled.
 
 Docker Compose runs step 2 before `prisma migrate deploy`. Locally: `npm run db:backfill-content-md && npx prisma migrate deploy` (not `migrate dev`, which would flag the script-added column as drift). Once the app runs fine on markdown, drop `content_legacy` in a follow-up migration.
+
+---
+
+## AI Assistant & RAG
+
+A chat panel in every note ("Ask AI"). The assistant answers from the current note and **all notes of the user**: an agent with read-only tools (`search_notes`, `semantic_search`, `get_note`, `list_notes`) plus the most relevant note fragments put into the prompt up front.
+
+### Setup
+
+```bash
+ollama pull bge-m3            # embedding model (multilingual), Ollama must be running
+docker compose up -d db       # pgvector/pgvector:pg15-trixie
+npx prisma migrate deploy     # vector extension + NoteChunk + AiCredential
+```
+
+All settings live in `.env` — see the commented **AI** and **RAG** sections of `.env.example` (provider, model, limits, chunk size, top-k, min score, indexing interval...). Changing `RAG_EMBEDDING_MODEL` re-indexes all notes automatically.
+
+### Accounts — everyone uses their own Claude
+
+Requests run on the **user's own** Claude account, set in the app (Ask AI → ⚙ AI settings):
+
+- **Claude subscription** — run `claude setup-token` (on any computer with Claude Code), sign in with *your* Claude account, paste the `sk-ant-oat01-…` token. Uses your Pro/Max plan limits.
+- **Anthropic API key** — `sk-ant-api03-…` from console.anthropic.com, billed per use.
+
+`AI_SERVER_LOGIN_EMAILS` lists users who may fall back to the server machine's own `claude` login (e.g. the owner). Everyone else gets `403 AI_CREDENTIALS_REQUIRED` until they connect an account. A token is personal — each person connects their own; don't share one account between people.
+
+### RAG
+
+- Notes are split by markdown headings (`RAG_CHUNK_SIZE`, `RAG_CHUNK_OVERLAP`), embedded with Ollama and stored in `NoteChunk` (pgvector).
+- A background job (`RAG_INDEX_INTERVAL_MS`) re-indexes notes whose `updatedAt` is newer than `ragIndexedAt`, after `RAG_INDEX_DEBOUNCE_MS` without edits — no hooks in the notes module.
+- Search is exact cosine similarity filtered by user (`RAG_TOP_K`, `RAG_MIN_SCORE`); `RAG_AUTO_CONTEXT_K` fragments go into the prompt for every question.
+- If Ollama is down, indexing retries later and the assistant falls back to full-text search.
+
+### Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/ai/chat` | Chat turn `{ messages, noteId? }`, SSE: `text_delta`, `text`, `tool_call`, `tool_result`, `sources`, `done`, `error` |
+| `GET` | `/api/ai/settings` | Provider, account status, RAG index stats |
+| `PUT` / `DELETE` | `/api/ai/credentials` | Save `{ type, secret }` / remove the user's Claude credential |
+| `POST` | `/api/ai/credentials/test` | Tiny run on the user's account |
+
+### Security
+
+- **Credentials:** AES-256-GCM with `AI_CREDENTIALS_SECRET`, bound to the user id (a ciphertext moved to another user fails); never returned by the API (only a 4-char hint); format-checked; save/test throttled.
+- **Isolation per run:** a user credential runs with a fresh private `CLAUDE_CONFIG_DIR` (0700, removed afterwards); the host's `ANTHROPIC_API_KEY` / tokens are never passed on. Built-in Claude Code tools (Bash, files, web) are disabled — the agent can only call the read-only note tools, bound to the user from the JWT.
+- **Data isolation:** every note/RAG query filters by the JWT user (RAG twice: chunk owner and note owner).
+- **Prompt injection:** notes and history are wrapped as data, framing tags inside them are neutralized, the system prompt says note contents are not instructions; the agent has no write or network tools to abuse.
+- **Abuse limits:** throttling (`AI_CHAT_RATE_LIMIT_PER_MIN`, per IP), concurrent runs per user and in total (`AI_MAX_CONCURRENT_RUNS*`), DTO size limits, history budget, timeouts.
 
 ---
 
