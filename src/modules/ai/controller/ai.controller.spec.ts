@@ -15,6 +15,7 @@ import { ChatEvent } from '../types/chat.types';
 describe('AiController', () => {
   const auth: AiAuth = { kind: 'claude-oauth-token', token: 'tok' };
   const complete = jest.fn<ReturnType<AiService['complete']>, Parameters<AiService['complete']>>();
+  const assist = jest.fn<ReturnType<AiService['assist']>, Parameters<AiService['assist']>>();
   const run = jest.fn<AsyncIterable<AgentEvent>, Parameters<AiAgentService['run']>>();
   const chat = jest.fn<ReturnType<AiChatService['chat']>, Parameters<AiChatService['chat']>>();
   const authForAgent = jest.fn<Promise<AiAuth>, [string]>();
@@ -25,7 +26,7 @@ describe('AiController', () => {
   limiter.run = AiRunLimiter.prototype.run.bind(limiter) as AiRunLimiter['run'];
 
   const controller = new AiController(
-    { complete } as unknown as AiService,
+    { complete, assist } as unknown as AiService,
     { run } as unknown as AiAgentService,
     { chat } as unknown as AiChatService,
     { authForAgent, authForLlm } as unknown as AiCredentialsService,
@@ -73,6 +74,17 @@ describe('AiController', () => {
     expect(complete).toHaveBeenCalledWith('hi', 'user-1', auth);
     expect(acquire).toHaveBeenCalledWith('user-1');
     expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('assist: runs on the user account inside a limiter slot', async () => {
+    const result = { text: '- a', provider: 'claude' as const, durationMs: 1 };
+    assist.mockResolvedValue(result);
+    const dto = { action: 'summarize' as const, text: 'long text' };
+
+    await expect(controller.assist(dto, user)).resolves.toBe(result);
+    expect(assist).toHaveBeenCalledWith(dto, 'user-1', auth);
+    expect(authForLlm).toHaveBeenCalledWith('user-1');
+    expect(acquire).toHaveBeenCalledWith('user-1');
   });
 
   it('agent: streams events as SSE and ends the response', async () => {

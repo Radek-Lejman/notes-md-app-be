@@ -10,6 +10,7 @@ import { AiCredentialsService } from '../credentials/aiCredentials.service';
 import { AiRunLimiter } from '../credentials/aiRunLimiter.service';
 import { CompleteDto, CompleteResponseDto } from '../dto/complete.dto';
 import { AgentRunDto } from '../dto/agentRun.dto';
+import { AssistDto, AssistResponseDto } from '../dto/assist.dto';
 import { ChatDto } from '../dto/chat.dto';
 import { ChatEvent } from '../types/chat.types';
 import { AI_CHAT_THROTTLE, AI_THROTTLE } from '../consts/ai.consts';
@@ -39,6 +40,14 @@ export class AiController {
   ): Promise<CompleteResponseDto> {
     const auth = await this.credentials.authForLlm(user.sub);
     return this.limiter.run(user.sub, () => this.aiService.complete(dto.prompt, user.sub, auth));
+  }
+
+  /** Ask AI in the editor: explain / summarize / rewrite... the selected text. */
+  @HttpCode(HttpStatus.OK)
+  @Post('assist')
+  async assist(@Body() dto: AssistDto, @CurrentUser() user: AuthUser): Promise<AssistResponseDto> {
+    const auth = await this.credentials.authForLlm(user.sub);
+    return this.limiter.run(user.sub, () => this.aiService.assist(dto, user.sub, auth));
   }
 
   /** Streams agent progress as Server-Sent Events (text/event-stream). */

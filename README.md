@@ -345,6 +345,7 @@ Requests run on the **user's own** Claude account, set in the app (Ask AI → �
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/api/ai/chat` | Chat turn `{ messages, noteId? }`, SSE: `text_delta`, `text`, `tool_call`, `tool_result`, `sources`, `done`, `error` |
+| `POST` | `/api/ai/assist` | Ask AI in the editor `{ action, text?, instruction? }` → `{ text }` (markdown); actions: `explain`, `summarize`, `improve`, `fix`, `translate`, `continue`, `custom` |
 | `GET` | `/api/ai/settings` | Provider, account status, RAG index stats |
 | `PUT` / `DELETE` | `/api/ai/credentials` | Save `{ type, secret }` / remove the user's Claude credential |
 | `POST` | `/api/ai/credentials/test` | Tiny run on the user's account |

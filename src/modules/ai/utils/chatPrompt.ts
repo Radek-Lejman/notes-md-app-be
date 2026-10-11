@@ -79,7 +79,7 @@ export function buildChatTask(messages: ChatMessageDto[]): string {
 
 // Tags used to frame data in prompts. Data must not close them and smuggle in "instructions".
 const FRAME_TAGS =
-  /<(\/?)(current_note|relevant_note_fragments|fragment|conversation_history|user|assistant)\b/gi;
+  /<(\/?)(current_note|relevant_note_fragments|fragment|conversation_history|user|assistant|selected_text)\b/gi;
 
 /** Neutralizes our framing tags inside user/note data. */
 export function escapeData(value: string): string {
