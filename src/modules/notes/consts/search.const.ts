@@ -5,6 +5,4 @@ export const NOTE_SEARCHABLE_FIELDS = ['title', 'content'] as const satisfies Re
   keyof Note
 >;
 
-export const NOTE_SEARCH_RELEVANCE_FIELDS: Prisma.NoteOrderByRelevanceFieldEnum[] = [
-  'title',
-];
+export const NOTE_SEARCH_RELEVANCE_FIELDS: Prisma.NoteOrderByRelevanceFieldEnum[] = ['title'];

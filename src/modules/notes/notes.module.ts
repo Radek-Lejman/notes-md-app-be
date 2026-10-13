@@ -13,11 +13,11 @@ import { NotesPgRepository } from './utils/notesPgRepository';
   controllers: [NotesController],
   imports: [UsersModule, SecurityModule, JwtModule.register({ global: true })],
   providers: [
-    UserNotesService, 
+    UserNotesService,
     NotesService,
-    NotesTreeService, 
-    NotesSearchService, 
-    NotesPgRepository
+    NotesTreeService,
+    NotesSearchService,
+    NotesPgRepository,
   ],
   exports: [UserNotesService],
 })

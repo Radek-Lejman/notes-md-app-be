@@ -68,7 +68,10 @@ describe('buildSnippet', () => {
   });
 
   it('keeps the match when lower-casing would change the text length', () => {
-    const snippet = buildSnippet(`${'İ'.repeat(200)} ${filler(40)} kubernetes ${filler(40)}`, 'kubernetes');
+    const snippet = buildSnippet(
+      `${'İ'.repeat(200)} ${filler(40)} kubernetes ${filler(40)}`,
+      'kubernetes',
+    );
     expect(snippet).toContain('kubernetes');
   });
 

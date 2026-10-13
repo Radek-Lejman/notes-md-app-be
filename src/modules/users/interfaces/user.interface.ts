@@ -7,5 +7,4 @@ export interface User {
   tokenVersion: number;
 }
 
-
-export type UserLogin = Pick<User, 'email' | 'password'>
+export type UserLogin = Pick<User, 'email' | 'password'>;
