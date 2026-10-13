@@ -5,5 +5,19 @@
   "testRegex": ".e2e-spec.ts$",
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "globalSetup": "<rootDir>/support/global-setup.ts",
+  "setupFiles": ["<rootDir>/e2e-env.setup.ts", "<rootDir>/unit-env.setup.ts"],
+  "maxWorkers": 1,
+  "testTimeout": 30000,
+  "moduleNameMapper": {
+    "^@ai(.*)$": "<rootDir>/../src/infrastructure/ai$1",
+    "^@core(.*)$": "<rootDir>/../src/core$1",
+    "^@security(.*)$": "<rootDir>/../src/infrastructure/security$1",
+    "^@common(.*)$": "<rootDir>/../src/common$1",
+    "^@database(.*)$": "<rootDir>/../src/infrastructure/database$1",
+    "^src/(.*)$": "<rootDir>/../src/$1",
+    "^marked$": "<rootDir>/../node_modules/marked/lib/marked.umd.js",
+    "^@anthropic-ai/claude-agent-sdk$": "<rootDir>/../src/__mocks__/@anthropic-ai/claude-agent-sdk.ts"
   }
 }
