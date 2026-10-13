@@ -25,7 +25,7 @@
       "@core/*": ["src/core/*"],
       "@common": ["src/common/index.ts"],
       "@common/*": ["src/common/*"],
-      "@database": ["rc/infrastructure/database"],
+      "@database": ["src/infrastructure/database"],
       "@database/*": ["src/infrastructure/database/*"],
       "@ai": ["src/infrastructure/ai"],
       "@ai/*": ["src/infrastructure/ai/*"]

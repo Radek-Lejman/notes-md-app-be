@@ -1,0 +1,3 @@
+sh scripts/hooks/check-branch.sh main develop
+sh scripts/hooks/check-migrations.sh
+lint-staged

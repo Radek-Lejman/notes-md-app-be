@@ -63,3 +63,7 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 # Prisma generated files (in unusual directory)
 generated/prisma
+# Secrets and local artifacts (see docs/ai-dev-system/GIT-HOOKS.md)
+.env.*
+!.env.example
+cookies.txt
