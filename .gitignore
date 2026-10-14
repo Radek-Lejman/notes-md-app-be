@@ -67,3 +67,7 @@ generated/prisma
 .env.*
 !.env.example
 cookies.txt
+
+# Claude Code: personal settings stay local
+.claude/settings.local.json
+CLAUDE.local.md
