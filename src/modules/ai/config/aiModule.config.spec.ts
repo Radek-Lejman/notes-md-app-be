@@ -8,15 +8,16 @@ describe('loadAiModuleConfig', () => {
     for (const key of Object.keys(process.env)) {
       if (/^(AI_|RAG_)/.test(key)) delete process.env[key];
     }
+    process.env.AI_CREDENTIALS_SECRET = 's'.repeat(32);
   });
 
   afterAll(() => {
     process.env = originalEnv;
   });
 
-  it('uses safe defaults when nothing is configured', () => {
+  it('uses safe defaults when only the credentials secret is configured', () => {
     expect(loadAiModuleConfig()).toEqual({
-      credentialsSecret: 'dev-only-ai-credentials-secret-change-me-0123456789',
+      credentialsSecret: 's'.repeat(32),
       serverLoginEmails: [],
       limits: {
         maxConcurrentRuns: 3,
@@ -75,6 +76,13 @@ describe('loadAiModuleConfig', () => {
   it('caps the chunk overlap at half of the chunk size', () => {
     Object.assign(process.env, { RAG_CHUNK_SIZE: '1000', RAG_CHUNK_OVERLAP: '501' });
     expect(() => loadAiModuleConfig()).toThrow('RAG_CHUNK_OVERLAP must be <= 500');
+  });
+
+  it('requires AI_CREDENTIALS_SECRET (no fallback known from the repo)', () => {
+    delete process.env.AI_CREDENTIALS_SECRET;
+    expect(() => loadAiModuleConfig()).toThrow(
+      '[config] AI_CREDENTIALS_SECRET is required (copy .env.example to .env)',
+    );
   });
 
   it.each([

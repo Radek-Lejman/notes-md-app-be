@@ -79,5 +79,9 @@ export function envSecret(name: string, devFallback?: string, minBytes = 32): st
   if (Buffer.byteLength(raw, 'utf8') < minBytes) {
     throw new Error(`[config] ${name} must be at least ${minBytes} bytes`);
   }
+  // The placeholders in .env.example are public: a copied .env must not reach production.
+  if (isProd && /change-me/i.test(raw)) {
+    throw new Error(`[config] ${name} still holds the .env.example placeholder`);
+  }
   return raw;
 }

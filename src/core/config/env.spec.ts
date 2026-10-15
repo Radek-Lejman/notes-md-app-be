@@ -129,6 +129,14 @@ describe('env helpers', () => {
   });
 
   describe('in production', () => {
+    it('envSecret rejects the .env.example placeholders', () => {
+      const env = loadInProduction();
+      process.env.TEST_VAR = 'change-me-at-least-32-bytes-long-secret';
+      expect(() => env.envSecret('TEST_VAR')).toThrow(
+        '[config] TEST_VAR still holds the .env.example placeholder',
+      );
+    });
+
     it('envSecret ignores the dev fallback', () => {
       const env = loadInProduction();
       expect(env.isProd).toBe(true);

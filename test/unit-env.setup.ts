@@ -5,3 +5,4 @@
  */
 process.env.JWT_ACCESS_SECRET = 'unit-test-access-secret-0123456789abcdef';
 process.env.JWT_REFRESH_SECRET = 'unit-test-refresh-secret-0123456789abcdef';
+process.env.AI_CREDENTIALS_SECRET = 'unit-test-ai-credentials-secret-0123456789';

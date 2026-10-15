@@ -43,10 +43,9 @@ export function loadAiModuleConfig(): AiModuleConfig {
   const chunkSize = envNumber('RAG_CHUNK_SIZE', { default: 1500, min: 200, max: 8000 });
 
   return {
-    credentialsSecret: envSecret(
-      'AI_CREDENTIALS_SECRET',
-      'dev-only-ai-credentials-secret-change-me-0123456789',
-    ),
+    // No dev fallback: a key known from the repo would decrypt every saved credential on any
+    // deployment that does not set NODE_ENV=production.
+    credentialsSecret: envSecret('AI_CREDENTIALS_SECRET'),
     serverLoginEmails: envString('AI_SERVER_LOGIN_EMAILS', { default: '' })
       .split(',')
       .map((email) => email.trim().toLowerCase())
