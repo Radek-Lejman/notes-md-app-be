@@ -9,6 +9,7 @@ import { Request } from 'express';
 import { AccessTokenService } from '../services/accessToken.service';
 import { Reflector } from '@nestjs/core';
 import { ENDPOINT_IS_PUBLIC_KEY } from '@common/decorators';
+import { JsonWebTokenError } from '@nestjs/jwt';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -18,7 +19,7 @@ export class JwtAuthGuard implements CanActivate {
     private reflector: Reflector,
     private readonly jwtService: AccessTokenService,
   ) {}
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const isPublic = this.reflector.getAllAndOverride<boolean>(ENDPOINT_IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -31,9 +32,10 @@ export class JwtAuthGuard implements CanActivate {
     const token = req.cookies?.access_token;
     if (!token) throw new UnauthorizedException('Token does not exist');
     try {
-      const payload = this.jwtService.verifyAccessToken(token);
-      req['user'] = payload;
+      req['user'] = await this.jwtService.authenticate(token);
     } catch (e: unknown) {
+      // A DB failure is a server fault, not a reason to log the user out.
+      if (!(e instanceof JsonWebTokenError || e instanceof UnauthorizedException)) throw e;
       this.logger.error('Token authentication failed', { e });
       throw new UnauthorizedException('Invalid token');
     }

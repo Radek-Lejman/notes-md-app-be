@@ -128,10 +128,9 @@ describe('AuthService', () => {
         refreshToken: 'rotated.jwt',
       });
       expect(users.findById).toHaveBeenCalledWith('user-1');
-      expect(accessTokens.createToken).toHaveBeenCalledWith({
-        id: 'user-1',
-        email: 'alice@example.com',
-      });
+      expect(accessTokens.createToken).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'user-1', email: 'alice@example.com', tokenVersion: 2 }),
+      );
       expect(refreshTokens.rotate).toHaveBeenCalledWith('old.jwt');
     });
 

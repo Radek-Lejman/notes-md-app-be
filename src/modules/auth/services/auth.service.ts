@@ -42,10 +42,7 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token revoked');
     }
 
-    const accessToken = await this.accessTokenService.createToken({
-      id: user.id,
-      email: user.email,
-    });
+    const accessToken = await this.accessTokenService.createToken(user);
 
     const refreshToken = await this.refreshTokenService.rotate(oldRefreshToken);
 

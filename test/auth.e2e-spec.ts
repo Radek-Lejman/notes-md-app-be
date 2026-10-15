@@ -80,4 +80,24 @@ describe('Auth refresh (e2e)', () => {
 
     expect((await refreshWith(oldRefreshToken!)).status).toBe(401);
   });
+
+  it('rejects an access token issued before "log out everywhere" right away', async () => {
+    const user = await registerUser(app);
+    const accessToken = await user.agent
+      .post('/api/auth/refresh')
+      .set('X-CSRF-Token', user.csrfToken)
+      .expect(201)
+      .then((res) =>
+        ([] as string[])
+          .concat(res.headers['set-cookie'] ?? [])
+          .map((cookie) => cookie.split(';')[0])
+          .find((cookie) => cookie.startsWith('access_token=')),
+      );
+    expect(accessToken).toBeTruthy();
+    const me = () => request(app.getHttpServer()).get('/api/auth/me').set('Cookie', accessToken!);
+
+    await me().expect(200);
+    await user.agent.post('/api/auth/revokeAll').set('X-CSRF-Token', user.csrfToken).expect(201);
+    await me().expect(401);
+  });
 });

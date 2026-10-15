@@ -75,6 +75,12 @@ describe('JWT configs', () => {
     },
   );
 
+  it('reject the same secret for access and refresh tokens', () => {
+    expect(() =>
+      load({ JWT_ACCESS_SECRET: 'same'.repeat(8), JWT_REFRESH_SECRET: 'same'.repeat(8) }),
+    ).toThrow('[config] JWT_REFRESH_SECRET must differ from JWT_ACCESS_SECRET');
+  });
+
   it('require real secrets in production (no dev fallback)', () => {
     expect(() =>
       load({ NODE_ENV: 'production', JWT_ACCESS_SECRET: '', JWT_REFRESH_SECRET: '' }),

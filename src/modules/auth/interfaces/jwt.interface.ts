@@ -1,12 +1,13 @@
 export interface AccessTokenPayload {
   sub: string;
   email: string;
+  /** User.tokenVersion at issue time; "log out everywhere" bumps it and voids older tokens. */
+  tokenVersion: number;
   iat?: number;
   exp?: number;
 }
 
 export type RefreshTokenPayload = AccessTokenPayload & {
-  tokenVersion: number;
   jti: string;
 };
 
