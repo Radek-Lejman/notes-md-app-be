@@ -117,7 +117,9 @@ describe('env helpers', () => {
 
     it('uses the dev fallback outside production', () => {
       expect(envSecret('TEST_VAR', 'f'.repeat(32))).toBe('f'.repeat(32));
-      expect(() => envSecret('TEST_VAR')).toThrow('[config] TEST_VAR is required');
+      expect(() => envSecret('TEST_VAR')).toThrow(
+        '[config] TEST_VAR is required (copy .env.example to .env)',
+      );
     });
 
     it('honours a custom minimum', () => {

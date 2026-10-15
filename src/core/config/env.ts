@@ -73,7 +73,8 @@ export function envBoolean(name: string, opts?: Opts<boolean>): boolean {
 export function envSecret(name: string, devFallback?: string, minBytes = 32): string {
   const raw = rawEnv(name) ?? (isProd ? undefined : devFallback);
   if (!raw) {
-    throw new Error(`[config] ${name} is required${isProd ? ' in production' : ''}`);
+    const hint = isProd ? ' in production' : ' (copy .env.example to .env)';
+    throw new Error(`[config] ${name} is required${hint}`);
   }
   if (Buffer.byteLength(raw, 'utf8') < minBytes) {
     throw new Error(`[config] ${name} must be at least ${minBytes} bytes`);

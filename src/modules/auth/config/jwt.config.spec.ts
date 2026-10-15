@@ -62,13 +62,18 @@ describe('JWT configs', () => {
     expect(() => load({ ...SECRETS, [key]: value })).toThrow(message);
   });
 
-  // D12: the dev fallbacks ('default-access-secret', 'default-refresh-secret') are shorter than
-  // the 32 bytes envSecret() requires, so without JWT_*_SECRET the app does not start even in dev.
-  it.failing('D12: fall back to dev secrets outside production', () => {
-    const { access, refresh } = load({ JWT_ACCESS_SECRET: '', JWT_REFRESH_SECRET: '' });
-    expect(access.default().secret).toBeTruthy();
-    expect(refresh.default().secret).toBeTruthy();
-  });
+  // D12: the dev fallbacks were shorter than the 32 bytes envSecret() requires, so the app
+  // failed with a misleading "must be at least 32 bytes". Fixed by dropping the fallbacks (a
+  // secret known from the repo would make sessions forgeable wherever NODE_ENV is not
+  // production) and pointing to .env.example instead.
+  it.each(['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'])(
+    'D12: require %s also outside production, with a hint to .env.example',
+    (key) => {
+      expect(() => load({ ...SECRETS, [key]: '' })).toThrow(
+        `[config] ${key} is required (copy .env.example to .env)`,
+      );
+    },
+  );
 
   it('require real secrets in production (no dev fallback)', () => {
     expect(() =>

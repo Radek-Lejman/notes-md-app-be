@@ -12,7 +12,9 @@ export const jwtAccessTokenConstant: {
   secret: string;
   expire_in: MinutesJwtConfigString;
 } = {
-  secret: envSecret('JWT_ACCESS_SECRET', 'default-access-secret'),
+  // No dev fallback: a secret known from the repo would let anyone forge sessions on any
+  // deployment that does not set NODE_ENV=production.
+  secret: envSecret('JWT_ACCESS_SECRET'),
   expire_in: `${accessTokenExpireIn}m`,
 };
 

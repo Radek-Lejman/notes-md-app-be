@@ -12,7 +12,8 @@ export const jwtRefreshTokenConstants: {
   secret: string;
   expire_in: DaysJwtConfigString;
 } = {
-  secret: envSecret('JWT_REFRESH_SECRET', 'default-refresh-secret'),
+  // No dev fallback, see jwt.config.ts.
+  secret: envSecret('JWT_REFRESH_SECRET'),
   expire_in: `${refreshTokenExpireIn}d`,
 };
 
