@@ -8,6 +8,8 @@ import { LoginDto } from '../dto/login.dto';
 import { RefreshTokenService } from './refreshToken.serivce';
 import { User } from 'src/modules/users/interfaces/user.interface';
 import { BruteForceService } from 'src/infrastructure/security/services/bruteForceService';
+import { JsonWebTokenError } from '@nestjs/jwt';
+import { RefreshTokenPayload } from '../interfaces/jwt.interface';
 
 @Injectable()
 export class AuthService {
@@ -23,7 +25,16 @@ export class AuthService {
     const oldRefreshToken = req.cookies.refresh_token;
     if (!oldRefreshToken) throw new UnauthorizedException('Missing refresh token');
 
-    const payload = this.refreshTokenService.verifyToken(oldRefreshToken);
+    let payload: RefreshTokenPayload;
+    try {
+      payload = this.refreshTokenService.verifyToken(oldRefreshToken);
+    } catch (err: unknown) {
+      // Expired, forged and malformed tokens get the same answer (TokenExpiredError and
+      // NotBeforeError extend JsonWebTokenError); anything else is a server fault.
+      if (err instanceof JsonWebTokenError)
+        throw new UnauthorizedException('Invalid refresh token');
+      throw err;
+    }
     const user = await this.userService.findById(payload.sub);
     if (!user) throw new UnauthorizedException('Invalid refresh token');
 

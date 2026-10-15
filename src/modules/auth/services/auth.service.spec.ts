@@ -1,5 +1,5 @@
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
-import { JsonWebTokenError } from '@nestjs/jwt';
+import { JsonWebTokenError, TokenExpiredError } from '@nestjs/jwt';
 import { Request } from 'express';
 import * as bcrypt from 'bcryptjs';
 import { UsersService } from 'src/modules/users/users.service';
@@ -154,9 +154,7 @@ describe('AuthService', () => {
       expect(refreshTokens.rotate).not.toHaveBeenCalled();
     });
 
-    // D1: verifyToken throws JsonWebTokenError/TokenExpiredError, which is not caught here,
-    // so an expired or forged refresh cookie ends in a 500 instead of a 401.
-    it.failing('D1: rejects an expired or forged refresh token with 401', async () => {
+    it('D1: rejects an expired or forged refresh token with 401', async () => {
       refreshTokens.verifyToken.mockImplementation(() => {
         throw new JsonWebTokenError('invalid signature');
       });
@@ -164,6 +162,28 @@ describe('AuthService', () => {
       await expect(service.refresh(withCookie('forged.jwt'))).rejects.toBeInstanceOf(
         UnauthorizedException,
       );
+      expect(users.findById).not.toHaveBeenCalled();
+      expect(refreshTokens.rotate).not.toHaveBeenCalled();
+    });
+
+    it('rejects an expired refresh token with the same message as a forged one', async () => {
+      refreshTokens.verifyToken.mockImplementation(() => {
+        throw new TokenExpiredError('jwt expired', new Date());
+      });
+
+      await expect(service.refresh(withCookie('expired.jwt'))).rejects.toThrow(
+        new UnauthorizedException('Invalid refresh token'),
+      );
+    });
+
+    it('does not turn an unexpected verification error into a 401', async () => {
+      const failure = new Error('secretOrPrivateKey must have a value');
+      refreshTokens.verifyToken.mockImplementation(() => {
+        throw failure;
+      });
+
+      await expect(service.refresh(withCookie('old.jwt'))).rejects.toBe(failure);
+      expect(accessTokens.createToken).not.toHaveBeenCalled();
     });
   });
 
