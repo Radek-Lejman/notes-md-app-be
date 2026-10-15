@@ -77,14 +77,15 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post('/revokeAll')
-  revokeAll(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+  async revokeAll(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const user = req['user'];
 
     if (!user) {
       throw new UnauthorizedException('User not found in request');
     }
 
-    this.authService.revokeAll(user.sub);
+    // Clear the cookies only once revoking succeeded, so a failure is not reported as a logout.
+    await this.authService.revokeAll(user.sub);
     clearAuthCookies(res);
 
     return { message: 'All refresh tokens revoked, logged out' };

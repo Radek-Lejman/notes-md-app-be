@@ -89,29 +89,25 @@ describe('AuthController', () => {
     it("revokes the current user's sessions and clears the cookies", async () => {
       const req = { user: { sub: 'user-1' } } as unknown as Request;
 
-      // Promise.resolve: the handler is synchronous today (see D2) and async once fixed.
-      await expect(Promise.resolve(controller.revokeAll(req, res))).resolves.toEqual({
+      await expect(controller.revokeAll(req, res)).resolves.toEqual({
         message: 'All refresh tokens revoked, logged out',
       });
       expect(authService.revokeAll).toHaveBeenCalledWith('user-1');
       cookiesSet().forEach((cookie) => expect(cookie).toContain('Max-Age=0'));
     });
 
-    it('rejects a request without an authenticated user', () => {
-      expect(() => controller.revokeAll({} as Request, res)).toThrow(UnauthorizedException);
+    it('rejects a request without an authenticated user', async () => {
+      await expect(controller.revokeAll({} as Request, res)).rejects.toThrow(UnauthorizedException);
       expect(authService.revokeAll).not.toHaveBeenCalled();
     });
 
-    // D2: authService.revokeAll() is not awaited — when it fails, the client is told that the
-    // sessions were revoked, they stay valid, and the rejection is unhandled.
-    it.failing('D2: fails the request when revoking fails', async () => {
-      const failure = Promise.reject(new Error('db down'));
-      failure.catch(() => undefined); // keep the unawaited rejection from crashing the test run
-      authService.revokeAll.mockReturnValue(failure);
+    it('D2: fails the request and keeps the cookies when revoking fails', async () => {
+      authService.revokeAll.mockRejectedValue(new Error('db down'));
 
       await expect(
         controller.revokeAll({ user: { sub: 'user-1' } } as unknown as Request, res),
       ).rejects.toThrow('db down');
+      expect(setHeader).not.toHaveBeenCalled();
     });
   });
 });

@@ -85,9 +85,6 @@
     }
   },
   "src/modules/auth/controllers/auth.controller.ts": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    },
     "@typescript-eslint/no-unsafe-argument": {
       "count": 1
     },

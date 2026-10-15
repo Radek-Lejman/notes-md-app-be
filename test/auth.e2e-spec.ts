@@ -61,4 +61,23 @@ describe('Auth refresh (e2e)', () => {
     );
     expect((await refreshWith(expired)).status).toBe(401);
   });
+
+  // The failure path of revokeAll (D2) is covered in auth.controller.spec.ts.
+  it('rejects a refresh token issued before "log out everywhere"', async () => {
+    const user = await registerUser(app);
+    const refreshed = await user.agent
+      .post('/api/auth/refresh')
+      .set('X-CSRF-Token', user.csrfToken)
+      .expect(201);
+    const oldRefreshToken = ([] as string[])
+      .concat(refreshed.headers['set-cookie'] ?? [])
+      .map((cookie) => cookie.split(';')[0])
+      .find((cookie) => cookie.startsWith('refresh_token='))
+      ?.slice('refresh_token='.length);
+    expect(oldRefreshToken).toBeTruthy();
+
+    await user.agent.post('/api/auth/revokeAll').set('X-CSRF-Token', user.csrfToken).expect(201);
+
+    expect((await refreshWith(oldRefreshToken!)).status).toBe(401);
+  });
 });
