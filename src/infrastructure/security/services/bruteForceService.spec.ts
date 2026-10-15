@@ -84,13 +84,28 @@ describe('BruteForceService', () => {
     expect(service.getRetryAfterSeconds('ip:1')).toBe((lockMs - 10_000) / 1000);
   });
 
-  // D11: getOrCreateEntry() clears lockedUntil once the 30 s window is over, so a failure
-  // recorded during the 2 min lock lifts it. Unreachable through BruteForceGuard today
-  // (it rejects locked keys before login), but the service API itself is wrong.
-  it.failing('D11: keeps the lock when a failure is recorded after the window', () => {
+  // D11: getOrCreateEntry() used to reset the entry, lock included, once the 30 s window was
+  // over, so a failure recorded during the 2 min lock lifted it. Reachable through
+  // BruteForceGuard by a race: parallel logins pass the guard just before the lock is set and
+  // fail (bcrypt) after the window has ended.
+  it('D11: keeps the lock when a failure is recorded after the window', () => {
     fail('ip:1', maxAttempts);
     jest.advanceTimersByTime(windowMs + 1);
 
+    service.recordFailure('ip:1');
+    expect(service.isLocked('ip:1')).toBe(true);
+    expect(service.getRetryAfterSeconds('ip:1')).toBe(Math.ceil((lockMs - windowMs - 1) / 1000));
+  });
+
+  it('starts counting from zero once the lock has expired', () => {
+    fail('ip:1', maxAttempts);
+    jest.advanceTimersByTime(lockMs);
+
+    service.recordFailure('ip:1');
+    expect(service.isLocked('ip:1')).toBe(false);
+
+    fail('ip:1', maxAttempts - 2);
+    expect(service.isLocked('ip:1')).toBe(false);
     service.recordFailure('ip:1');
     expect(service.isLocked('ip:1')).toBe(true);
   });

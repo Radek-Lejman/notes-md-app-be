@@ -24,8 +24,10 @@ export class BruteForceService {
       return newEntry;
     }
 
-    // Reset attempts if the time window has passed
-    if (currentTime - entry.firstAttemptTime > bruteForceConfig.windowMs) {
+    // Reset attempts if the time window has passed, but never while the key is locked:
+    // the lock (2 min) outlives the window (30 s) and must not be lifted by a late failure.
+    const locked = entry.lockedUntil !== undefined && entry.lockedUntil > currentTime;
+    if (!locked && currentTime - entry.firstAttemptTime > bruteForceConfig.windowMs) {
       entry.attempts = 0;
       entry.firstAttemptTime = currentTime;
       entry.lockedUntil = undefined;
