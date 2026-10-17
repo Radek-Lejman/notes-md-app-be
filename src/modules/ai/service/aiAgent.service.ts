@@ -3,6 +3,8 @@ import { AGENT_PROVIDER, AgentEvent, AgentProvider, AiAuth } from '@ai';
 import { UserNotesService } from 'src/modules/notes/service/userNotes.service';
 import { createNotesTools } from '../tools/notes.tools';
 import { AGENT_SYSTEM_PROMPT } from '../consts/ai.consts';
+import { AI_MODULE_CONFIG, AiModuleConfig } from '../config/aiModule.config';
+import { KEYWORD_SEARCH_PROMPT } from '../tools/keywordSearch.tool';
 
 /**
  * Agent use cases: picks tools + system prompt for the current user.
@@ -15,6 +17,7 @@ export class AiAgentService {
   constructor(
     @Inject(AGENT_PROVIDER) private readonly agent: AgentProvider,
     private readonly userNotesService: UserNotesService,
+    @Inject(AI_MODULE_CONFIG) private readonly config: AiModuleConfig,
   ) {}
 
   async *run(
@@ -27,10 +30,13 @@ export class AiAgentService {
       `user=${userId} provider=${this.agent.name} auth=${auth?.kind ?? 'server'} agent run started`,
     );
 
+    const keywordSearch = this.config.agentKeywordSearch;
     yield* this.agent.run({
       task,
-      systemPrompt: AGENT_SYSTEM_PROMPT,
-      tools: createNotesTools(this.userNotesService, userId),
+      systemPrompt: keywordSearch
+        ? `${AGENT_SYSTEM_PROMPT}\n${KEYWORD_SEARCH_PROMPT}`
+        : AGENT_SYSTEM_PROMPT,
+      tools: createNotesTools(this.userNotesService, userId, { keywordSearch }),
       signal,
       auth,
     });

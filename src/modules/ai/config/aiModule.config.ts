@@ -30,6 +30,8 @@ export interface AiModuleConfig {
   credentialsSecret: string;
   /** Users (emails) allowed to run on the host's own `claude` login when they saved no credential. */
   serverLoginEmails: string[];
+  /** Agent's search_notes = keyword search (tools/keywordSearch.tool.ts) instead of the basic one. */
+  agentKeywordSearch: boolean;
   limits: {
     maxConcurrentRuns: number;
     maxConcurrentRunsPerUser: number;
@@ -50,6 +52,7 @@ export function loadAiModuleConfig(): AiModuleConfig {
       .split(',')
       .map((email) => email.trim().toLowerCase())
       .filter(Boolean),
+    agentKeywordSearch: envBoolean('AI_AGENT_KEYWORD_SEARCH', { default: true }),
     limits: {
       maxConcurrentRuns: envNumber('AI_MAX_CONCURRENT_RUNS', { default: 3, min: 1, max: 50 }),
       maxConcurrentRunsPerUser: envNumber('AI_MAX_CONCURRENT_RUNS_PER_USER', {

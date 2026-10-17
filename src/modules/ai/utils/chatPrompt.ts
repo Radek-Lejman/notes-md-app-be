@@ -7,6 +7,7 @@ import {
   CHAT_RAG_PROMPT,
   CHAT_SYSTEM_PROMPT,
 } from '../consts/ai.consts';
+import { KEYWORD_SEARCH_PROMPT } from '../tools/keywordSearch.tool';
 
 export interface ChatPromptContext {
   currentNote?: CurrentNote;
@@ -14,6 +15,8 @@ export interface ChatPromptContext {
   ragEnabled?: boolean;
   /** Fragments of other notes found for the question. */
   fragments?: RagHit[];
+  /** search_notes is the keyword search tool (adds its guidance). */
+  keywordSearch?: boolean;
 }
 
 /** System prompt + context (current note, RAG fragments), all wrapped as data. */
@@ -21,9 +24,11 @@ export function buildChatSystemPrompt({
   currentNote,
   ragEnabled = false,
   fragments = [],
+  keywordSearch = false,
 }: ChatPromptContext = {}): string {
   const parts = [CHAT_SYSTEM_PROMPT];
   if (ragEnabled) parts.push(CHAT_RAG_PROMPT);
+  if (keywordSearch) parts.push(KEYWORD_SEARCH_PROMPT);
 
   if (currentNote) {
     parts.push(

@@ -19,6 +19,7 @@ describe('loadAiModuleConfig', () => {
     expect(loadAiModuleConfig()).toEqual({
       credentialsSecret: 's'.repeat(32),
       serverLoginEmails: [],
+      agentKeywordSearch: true,
       limits: {
         maxConcurrentRuns: 3,
         maxConcurrentRunsPerUser: 1,
@@ -52,6 +53,7 @@ describe('loadAiModuleConfig', () => {
       AI_CHAT_RATE_LIMIT_PER_MIN: '60',
       AI_RATE_LIMIT_PER_MIN: '30',
       RAG_ENABLED: 'false',
+      AI_AGENT_KEYWORD_SEARCH: 'false',
       RAG_CHUNK_SIZE: '1000',
       RAG_CHUNK_OVERLAP: '500',
       RAG_MIN_SCORE: '0.6',
@@ -59,6 +61,7 @@ describe('loadAiModuleConfig', () => {
 
     const config = loadAiModuleConfig();
     expect(config.credentialsSecret).toBe('x'.repeat(40));
+    expect(config.agentKeywordSearch).toBe(false);
     expect(config.limits).toEqual({
       maxConcurrentRuns: 10,
       maxConcurrentRunsPerUser: 2,

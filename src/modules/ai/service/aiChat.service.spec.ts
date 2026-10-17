@@ -8,6 +8,7 @@ import { CHAT_RAG_PROMPT, CHAT_SYSTEM_PROMPT } from '../consts/ai.consts';
 import { RagSearchService } from '../rag/ragSearch.service';
 import { RagHit } from '../rag/rag.types';
 import { AiModuleConfig } from '../config/aiModule.config';
+import { KEYWORD_SEARCH_PROMPT } from '../tools/keywordSearch.tool';
 
 describe('AiChatService', () => {
   const auth: AiAuth = { kind: 'server' };
@@ -114,6 +115,24 @@ describe('AiChatService', () => {
     });
 
     await expect(chatEvents()).resolves.toEqual([{ type: 'error', message: 'Agent stopped' }]);
+  });
+
+  describe('with keyword search (AI_AGENT_KEYWORD_SEARCH)', () => {
+    beforeEach(() => {
+      config.agentKeywordSearch = true;
+    });
+
+    afterEach(() => {
+      config.agentKeywordSearch = false;
+    });
+
+    it('swaps search_notes for the keyword tool and adds its guidance', async () => {
+      await collect(await service.chat(dto(), 'user-1', auth));
+
+      expect(lastRequest().systemPrompt).toBe(`${CHAT_SYSTEM_PROMPT}\n${KEYWORD_SEARCH_PROMPT}`);
+      const search = lastRequest().tools.find((t) => t.name === 'search_notes');
+      expect(Object.keys(search!.inputSchema)).toEqual(['keywords']);
+    });
   });
 
   describe('with RAG enabled', () => {

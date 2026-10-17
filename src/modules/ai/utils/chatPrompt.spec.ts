@@ -1,5 +1,6 @@
 import { buildChatSystemPrompt, buildChatTask, escapeData } from './chatPrompt';
 import { ChatMessageDto } from '../dto/chat.dto';
+import { KEYWORD_SEARCH_PROMPT } from '../tools/keywordSearch.tool';
 import {
   CHAT_HISTORY_MAX_CHARS,
   CHAT_NOTE_CONTEXT_MAX_CHARS,
@@ -12,6 +13,12 @@ const msg = (role: ChatMessageDto['role'], content: string): ChatMessageDto => (
 describe('buildChatSystemPrompt', () => {
   it('returns the base prompt without a current note', () => {
     expect(buildChatSystemPrompt()).toBe(CHAT_SYSTEM_PROMPT);
+  });
+
+  it('adds the keyword search guidance when that tool is used', () => {
+    expect(buildChatSystemPrompt({ keywordSearch: true })).toBe(
+      `${CHAT_SYSTEM_PROMPT}\n${KEYWORD_SEARCH_PROMPT}`,
+    );
   });
 
   it('appends the current note as tagged data with an escaped title', () => {

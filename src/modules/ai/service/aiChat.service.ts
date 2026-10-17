@@ -60,8 +60,10 @@ export class AiChatService {
     const addSource = (note: NoteRef) => sources.set(note.id, note);
     fragments.forEach((f) => addSource({ id: f.noteId, title: f.title }));
 
+    const keywordSearch = this.config.agentKeywordSearch;
     const tools = createNotesTools(this.userNotesService, userId, {
       onNoteRead: addSource,
+      keywordSearch,
       semanticSearch: this.ragSearch.enabled
         ? (query) => this.ragSearch.search(userId, query)
         : undefined,
@@ -73,6 +75,7 @@ export class AiChatService {
         currentNote,
         ragEnabled: this.ragSearch.enabled,
         fragments,
+        keywordSearch,
       }),
       tools,
       signal,

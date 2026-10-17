@@ -6,6 +6,7 @@ import { SearchNotesQueryDto } from 'src/modules/notes/dto/searchNotesQueryDto';
 import { Note } from 'src/modules/notes/interfaces/notes.interface';
 import { RagHit } from '../rag/rag.types';
 import { AGENT_LIST_LIMIT, AGENT_NOTE_MAX_CHARS, AGENT_SEARCH_LIMIT } from '../consts/ai.consts';
+import { createKeywordSearchTool } from './keywordSearch.tool';
 
 export interface NoteRef {
   id: string;
@@ -17,6 +18,8 @@ export interface NotesToolsOptions {
   onNoteRead?: (note: NoteRef) => void;
   /** Adds the semantic_search tool (RAG), already bound to the user. */
   semanticSearch?: (query: string) => Promise<RagHit[]>;
+  /** Replaces search_notes with the keyword search tool (see keywordSearch.tool.ts). */
+  keywordSearch?: boolean;
 }
 
 /**
@@ -78,6 +81,8 @@ export function createNotesTools(
       },
     }),
   ];
+
+  if (options.keywordSearch) tools[0] = createKeywordSearchTool(notes, userId);
 
   const { semanticSearch } = options;
   if (semanticSearch) {
