@@ -16,15 +16,17 @@ describe('toTsQuery', () => {
   });
 
   it.each([
-    // A lone "-" (from "<->") survives as a word: harmless for plainto_tsquery (FTS filter);
-    // its effect on to_tsquery in order=rank is covered by DB integration tests (audit §4).
-    ["a & b | !c <-> (d) :* 'e'", 'a:* & b:* & c:* & -:* & d:* & e:*'],
-    ['x\'); DROP TABLE "Note"; --', 'x:* & DROP:* & TABLE:* & Note:* & --:*'],
+    // Leftovers without a letter or digit ("-" from "<->", "--") are dropped.
+    ["a & b | !c <-> (d) :* 'e'", 'a:* & b:* & c:* & d:* & e:*'],
+    ['x\'); DROP TABLE "Note"; --', 'x:* & DROP:* & TABLE:* & Note:*'],
   ])('strips tsquery operators and quotes from %j', (input, expected) => {
     expect(toTsQuery(input)).toBe(expected);
   });
 
-  it.each(['', '   ', '!!! ??? &&&', '()'])('returns undefined without words: %j', (input) => {
-    expect(toTsQuery(input)).toBeUndefined();
-  });
+  it.each(['', '   ', '!!! ??? &&&', '()', '- -- _'])(
+    'returns undefined without words: %j',
+    (input) => {
+      expect(toTsQuery(input)).toBeUndefined();
+    },
+  );
 });

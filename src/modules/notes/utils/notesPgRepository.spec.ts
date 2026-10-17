@@ -43,6 +43,14 @@ describe('NotesPgRepository', () => {
     await expect(repository.searchNotesDb('user-1', 'docker')).resolves.toEqual([{ id: 'n1' }]);
   });
 
+  // plainto_tsquery drops the `:*` prefix operator built by toTsQuery, so "wakac" never
+  // matched "wakacje".
+  it('uses to_tsquery so prefix queries (word:*) work', async () => {
+    const { sql } = await runSearch('user-1', 'wakac:*');
+    expect(sql).toContain("to_tsquery('simple',");
+    expect(sql).not.toContain('plainto_tsquery');
+  });
+
   it('scopes the search to the user', async () => {
     const { sql } = await runSearch('user-1', 'docker');
     expect(sql).toContain('"userId" =');
