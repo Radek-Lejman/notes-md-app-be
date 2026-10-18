@@ -1,4 +1,4 @@
-import { buildSnippet, markdownToPlainText, toWords } from './markdownText';
+import { buildSnippet, foldDiacritics, markdownToPlainText, toWords } from './markdownText';
 
 describe('markdownToPlainText', () => {
   it.each([
@@ -37,6 +37,23 @@ describe('toWords', () => {
   });
 });
 
+describe('foldDiacritics', () => {
+  it.each([
+    ['Zażółć gęślą jaźń', 'Zazolc gesla jazn'],
+    ['Łódź ŁÓDŹ', 'Lodz LODZ'],
+    ['Crème brûlée, naïve', 'Creme brulee, naive'],
+    ['plain ascii 123', 'plain ascii 123'],
+  ])('%j -> %j', (input, expected) => {
+    expect(foldDiacritics(input)).toBe(expected);
+  });
+
+  it('keeps the length, also for characters it cannot fold to one unit', () => {
+    for (const text of ['İstanbul', 'ﬁle', 'emoji 😀 ok', 'ß']) {
+      expect(foldDiacritics(text)).toHaveLength(text.length);
+    }
+  });
+});
+
 describe('buildSnippet', () => {
   const filler = (words: number) => Array.from({ length: words }, (_, i) => `słowo${i}`).join(' ');
 
@@ -60,6 +77,14 @@ describe('buildSnippet', () => {
     expect(buildSnippet(`${filler(40)} kontenerach ${filler(40)}`, 'konten')).toContain(
       'kontenerach',
     );
+  });
+
+  it.each([
+    ['without diacritics finds the word with them', 'Żółw', 'zolw'],
+    ['with diacritics finds the word without them', 'Zolw', 'żółw'],
+    ['the Polish ł', 'łódkę', 'lodk'],
+  ])('matches %s', (_case, word, query) => {
+    expect(buildSnippet(`${filler(40)} ${word} ${filler(40)}`, query)).toContain(word);
   });
 
   it('does not match inside a word', () => {

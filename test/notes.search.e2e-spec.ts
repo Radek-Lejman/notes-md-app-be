@@ -23,6 +23,7 @@ describe('Notes full-text search (e2e)', () => {
     for (const note of [
       { title: 'Plan na wakacje', content: 'Wyjazd nad morze w lipcu 2026' },
       { title: 'Zakupy', content: 'Lista rzeczy, o których pisałem w notatkach' },
+      { title: 'Żółw w Łodzi', content: 'Zolw zjadl lodke' },
     ]) {
       await alice.agent
         .post('/api/notes')
@@ -50,6 +51,13 @@ describe('Notes full-text search (e2e)', () => {
   it('is case-insensitive and requires every word', async () => {
     expect(await search(alice, 'WYJAZD lipc')).toEqual(['Plan na wakacje']);
     expect(await search(alice, 'wyjazd zakupy')).toEqual([]);
+  });
+
+  it('ignores diacritics in both directions (simple_unaccent)', async () => {
+    expect(await search(alice, 'zolw')).toEqual(['Żółw w Łodzi']);
+    expect(await search(alice, 'łódk')).toEqual(['Żółw w Łodzi']);
+    expect(await search(alice, 'LODZ')).toEqual(['Żółw w Łodzi']);
+    expect(await search(alice, 'pisalem')).toEqual(['Zakupy']);
   });
 
   it('answers 200 with no results for input without words', async () => {

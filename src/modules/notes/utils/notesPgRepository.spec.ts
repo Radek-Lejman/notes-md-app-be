@@ -47,7 +47,7 @@ describe('NotesPgRepository', () => {
   // matched "wakacje".
   it('uses to_tsquery so prefix queries (word:*) work', async () => {
     const { sql } = await runSearch('user-1', 'wakac:*');
-    expect(sql).toContain("to_tsquery('simple',");
+    expect(sql).toContain("to_tsquery('simple_unaccent',");
     expect(sql).not.toContain('plainto_tsquery');
   });
 
