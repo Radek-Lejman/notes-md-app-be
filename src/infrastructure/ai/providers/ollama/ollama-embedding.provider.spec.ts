@@ -11,7 +11,7 @@ describe('OllamaEmbeddingProvider', () => {
 
   beforeEach(() => {
     fetchMock.mockReset();
-    global.fetch = fetchMock as unknown as typeof fetch;
+    global.fetch = fetchMock;
   });
 
   const respond = (status: number, body: unknown) =>

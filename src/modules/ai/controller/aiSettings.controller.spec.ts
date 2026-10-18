@@ -1,4 +1,4 @@
-import { AgentEvent, AgentProvider, AgentRunRequest, AiAuth } from '@ai';
+import { AgentEvent, AgentRunRequest, AiAuth } from '@ai';
 import { makeAiConfig, streamOf } from '@ai/testing/ai-test.utils';
 import { AuthUser } from '@security';
 import { AiSettingsController } from './aiSettings.controller';
@@ -33,7 +33,7 @@ describe('AiSettingsController', () => {
     limiter.run = AiRunLimiter.prototype.run.bind(limiter) as AiRunLimiter['run'];
     return new AiSettingsController(
       makeAiConfig(),
-      { name: 'claude-agent-sdk', usesAccountAuth, run } as AgentProvider,
+      { name: 'claude-agent-sdk', usesAccountAuth, run },
       {
         getStatus,
         canUseServerLogin,

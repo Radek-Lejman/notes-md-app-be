@@ -10,5 +10,5 @@ export function buildFieldSelector<
       return acc;
     },
     {} as Partial<Record<keyof TSelectShape, boolean>>,
-  ) as FieldSelector<TSelectShape>;
+  );
 }

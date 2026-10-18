@@ -1,4 +1,4 @@
-import { getSchema, Node, type JSONContent } from '@tiptap/core';
+import { getSchema, Node } from '@tiptap/core';
 import { MarkdownManager } from '@tiptap/markdown';
 import {
   createMarkdownExtensions,
@@ -75,6 +75,6 @@ export function tiptapToMarkdown(doc?: TiptapNode | null): ConversionResult {
   if (!doc) return { markdown: '', report };
 
   const [clean] = sanitize(doc, report);
-  const markdown = clean ? serializeMarkdown(manager, clean as JSONContent) : '';
+  const markdown = clean ? serializeMarkdown(manager, clean) : '';
   return { markdown, report };
 }

@@ -10,7 +10,7 @@ export class NoteMapper {
   static toDomain(prismaNote: NoteRow | null): Note | null;
   static toDomain(prismaNote: NoteRow | null): Note | null {
     if (!prismaNote) return null;
-    return { ...prismaNote } as Note;
+    return { ...prismaNote };
   }
 
   static toDomainList(prismaNotes: NoteRow[]): Note[] {

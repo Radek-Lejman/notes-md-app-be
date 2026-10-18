@@ -8,7 +8,7 @@ import { collect } from '../../testing/ai-test.utils';
 const reply = (content: string, toolCalls?: OllamaToolCall[]): OllamaChatResponse => ({
   model: 'qwen',
   done: true,
-  message: { role: 'assistant', content, tool_calls: toolCalls } as OllamaMessage,
+  message: { role: 'assistant', content, tool_calls: toolCalls },
 });
 
 const call = (name: string, args: Record<string, unknown> = {}): OllamaToolCall => ({

@@ -21,7 +21,7 @@ export interface AgentTool<TShape extends z.ZodRawShape = z.ZodRawShape> {
 
 /** Keeps handler input typed against the schema. */
 export function defineAgentTool<TShape extends z.ZodRawShape>(tool: AgentTool<TShape>): AgentTool {
-  return tool as unknown as AgentTool;
+  return tool;
 }
 
 export interface AgentRunRequest {

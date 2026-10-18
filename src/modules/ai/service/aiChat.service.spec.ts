@@ -96,7 +96,7 @@ describe('AiChatService', () => {
       const getNote = request.tools.find((t) => t.name === 'get_note')!;
       await getNote.handler({ id: 'n2' });
       await getNote.handler({ id: 'n2' });
-      yield { type: 'text', text: 'answer' } as AgentEvent;
+      yield { type: 'text', text: 'answer' };
       yield done;
     });
 
@@ -111,7 +111,7 @@ describe('AiChatService', () => {
     getNoteById.mockResolvedValue({ id: 'n2', title: 'TS', content: 'x' });
     run.mockImplementation(async function* (request) {
       await request.tools.find((t) => t.name === 'get_note')!.handler({ id: 'n2' });
-      yield { type: 'error', message: 'Agent stopped' } as AgentEvent;
+      yield { type: 'error', message: 'Agent stopped' };
     });
 
     await expect(chatEvents()).resolves.toEqual([{ type: 'error', message: 'Agent stopped' }]);

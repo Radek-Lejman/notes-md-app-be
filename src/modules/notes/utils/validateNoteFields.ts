@@ -14,5 +14,5 @@ export function validateAndNormalizeFields<TAllowed extends readonly string[]>(
       );
     }
   }
-  return Array.from(new Set(list)) as readonly TAllowed[number][];
+  return Array.from(new Set(list));
 }
