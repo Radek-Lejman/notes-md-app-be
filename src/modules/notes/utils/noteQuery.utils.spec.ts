@@ -54,19 +54,9 @@ describe('validateAndNormalizeFields', () => {
 });
 
 describe('buildNoteSearchOrderBy', () => {
-  it.each([
-    ['rank', 'asc'],
-    ['-rank', 'desc'],
-  ] as const)('orders by title relevance for %s, with stable tie-breakers', (order, sort) => {
-    expect(buildNoteSearchOrderBy(order, 'dock:*')).toEqual([
-      { _relevance: { fields: ['title'], search: 'dock:*', sort } },
-      { updatedAt: 'desc' },
-      { id: 'asc' },
-    ]);
-  });
-
-  it('rejects rank ordering without a search expression', () => {
-    expect(() => buildNoteSearchOrderBy('rank', undefined)).toThrow('Invalid sort field: "rank"');
+  // rank/-rank are ranked in the database (NotesPgRepository.searchNotesDb), never by Prisma.
+  it('rejects rank ordering', () => {
+    expect(() => buildNoteSearchOrderBy('rank')).toThrow('Invalid sort field: "rank"');
   });
 
   it.each([
@@ -74,7 +64,7 @@ describe('buildNoteSearchOrderBy', () => {
     ['title', { title: 'asc' }],
     ['-createdAt', { createdAt: 'desc' }],
   ] as const)('maps %s to a plain sort', (order, expected) => {
-    expect(buildNoteSearchOrderBy(order, 'q:*')).toEqual(expected);
+    expect(buildNoteSearchOrderBy(order)).toEqual(expected);
   });
 });
 

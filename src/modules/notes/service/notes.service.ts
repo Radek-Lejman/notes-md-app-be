@@ -94,6 +94,25 @@ export class NotesService {
       return [];
     }
 
+    if (options.rank) {
+      const direction = options.rank === 'best-first' ? -1 : 1;
+      const rankedIds = [...searchResults]
+        .sort((a, b) => direction * (a.rank - b.rank) || a.id.localeCompare(b.id))
+        .slice(0, take)
+        .map((row) => row.id);
+      const ranked = await this.prismaService.note.findMany({
+        where: { userId, id: { in: rankedIds } },
+        select: { ...selector, id: true },
+      });
+      const byId = new Map(ranked.map((note) => [note.id, note]));
+      return NoteMapper.toDomainList(
+        rankedIds.flatMap((id) => {
+          const note = byId.get(id);
+          return note ? [note] : [];
+        }),
+      );
+    }
+
     const notes = await this.prismaService.note.findMany({
       where: {
         userId,

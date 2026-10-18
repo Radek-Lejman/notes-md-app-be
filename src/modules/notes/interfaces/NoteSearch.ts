@@ -5,6 +5,8 @@ export interface NoteSearchOptions {
   orderBy: Prisma.NoteOrderByWithRelationInput | Prisma.NoteOrderByWithRelationInput[] | undefined;
   take: number;
   cursorId?: string;
+  /** Order by relevance computed in the database (`orderBy` and `cursorId` are ignored). */
+  rank?: 'best-first' | 'worst-first';
 }
 
 export type SearchCursorPayload = { id: string; order: 'updatedAt' | '-updatedAt' };

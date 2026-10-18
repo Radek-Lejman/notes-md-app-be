@@ -9,7 +9,7 @@ describe('NotesService', () => {
     create: jest.fn<Promise<unknown>, [unknown]>(),
     update: jest.fn<Promise<unknown>, [unknown]>(),
   };
-  const searchNotesDb = jest.fn<Promise<{ id: string }[]>, [string, string]>();
+  const searchNotesDb = jest.fn<Promise<{ id: string; rank?: number }[]>, [string, string]>();
   const service = new NotesService(
     { searchNotesDb } as unknown as NotesPgRepository,
     { note } as unknown as PrismaService,
@@ -144,6 +144,58 @@ describe('NotesService', () => {
 
       await service.getNoteByText('user-1', {}, 'q', { ...options, cursorId: 'n0' });
       expect(note.findMany.mock.calls[0][0]).toMatchObject({ cursor: { id: 'n0' }, skip: 1 });
+    });
+
+    describe('ordered by relevance (rank)', () => {
+      const hits = [
+        { id: 'low', rank: 0.1 },
+        { id: 'top', rank: 0.9 },
+        { id: 'b-mid', rank: 0.5 },
+        { id: 'a-mid', rank: 0.5 },
+      ];
+      const loaded = (ids: string[]) => ids.map((id) => ({ ...row, id }));
+
+      beforeEach(() => {
+        searchNotesDb.mockResolvedValue(hits);
+        // The database returns rows in its own order; the service must restore the ranking.
+        note.findMany.mockImplementation((args) => {
+          const { where } = args as { where: { id: { in: string[] } } };
+          return Promise.resolve(loaded([...where.id.in].reverse()));
+        });
+      });
+
+      it('returns the best matches first, ties by id, limited to take', async () => {
+        const found = await service.getNoteByText('user-1', { title: true }, 'q', {
+          orderBy: undefined,
+          take: 3,
+          rank: 'best-first',
+        });
+
+        expect(found.map((n) => n.id)).toEqual(['top', 'a-mid', 'b-mid']);
+        expect(note.findMany).toHaveBeenCalledWith({
+          where: { userId: 'user-1', id: { in: ['top', 'a-mid', 'b-mid'] } },
+          select: { title: true, id: true },
+        });
+      });
+
+      it('returns the worst matches first for worst-first', async () => {
+        const found = await service.getNoteByText('user-1', {}, 'q', {
+          orderBy: undefined,
+          take: 10,
+          rank: 'worst-first',
+        });
+        expect(found.map((n) => n.id)).toEqual(['low', 'a-mid', 'b-mid', 'top']);
+      });
+
+      it('skips a note that disappeared between the two queries', async () => {
+        note.findMany.mockResolvedValue(loaded(['top']));
+        const found = await service.getNoteByText('user-1', {}, 'q', {
+          orderBy: undefined,
+          take: 2,
+          rank: 'best-first',
+        });
+        expect(found.map((n) => n.id)).toEqual(['top']);
+      });
     });
 
     it('skips the second query when nothing matches', async () => {

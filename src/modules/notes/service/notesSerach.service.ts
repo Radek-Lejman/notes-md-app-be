@@ -8,6 +8,7 @@ import { buildFieldSelector } from '@core/selector/utils';
 import { decodeCursor } from '../utils/searchCursorPayload';
 import { toTsQuery } from '@database/prisma';
 import { buildNoteSearchOrderBy } from '../utils/orderByForSearch';
+import { NoteSearchOptions } from '../interfaces/NoteSearch';
 import { buildSnippet } from '../utils/markdownText';
 
 @Injectable()
@@ -37,7 +38,7 @@ export class NotesSearchService {
       sub,
       { ...rootSelector, content: true },
       tsq,
-      { orderBy: buildNoteSearchOrderBy(query.order, tsq), take, cursorId },
+      this.searchOptions(query.order, take, cursorId),
     );
 
     return (foundNotes ?? []).map(({ content, ...note }) => ({
@@ -45,6 +46,18 @@ export class NotesSearchService {
       ...(rootSelector.content && { content }),
       snippet: buildSnippet(content ?? '', query.q),
     }));
+  }
+
+  /** `rank` = best match first, `-rank` = worst first; computed by the database. */
+  private searchOptions(
+    order: SearchNotesQueryDto['order'],
+    take: number,
+    cursorId: string | undefined,
+  ): NoteSearchOptions {
+    if (order === 'rank' || order === '-rank') {
+      return { orderBy: undefined, take, rank: order === 'rank' ? 'best-first' : 'worst-first' };
+    }
+    return { orderBy: buildNoteSearchOrderBy(order), take, cursorId };
   }
 
   private buildRootNodeSelector(query: {

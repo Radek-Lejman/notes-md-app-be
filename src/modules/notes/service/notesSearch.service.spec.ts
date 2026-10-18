@@ -56,6 +56,17 @@ describe('NotesSearchService', () => {
     expect(options).toEqual({ orderBy: { updatedAt: 'asc' }, take: 20, cursorId: undefined });
   });
 
+  it.each([
+    ['rank', 'best-first'],
+    ['-rank', 'worst-first'],
+  ] as const)('ranks %s in the database (%s), without a Prisma sort', async (order, rank) => {
+    await service.searchByText(
+      'u1',
+      Object.assign(new SearchNotesQueryDto(), { q: 'docker', fields: 'title', limit: 5, order }),
+    );
+    expect(getNoteByText.mock.calls[0][3]).toEqual({ orderBy: undefined, take: 5, rank });
+  });
+
   it('continues from a valid cursor and ignores a malformed one', async () => {
     const cursor = encodeCursor({ id: 'n9', order: '-updatedAt' });
     const withCursor = (c: string) =>

@@ -51,6 +51,15 @@ describe('NotesPgRepository', () => {
     expect(sql).not.toContain('plainto_tsquery');
   });
 
+  it('computes relevance with the title weighted above the content', async () => {
+    const { sql } = await runSearch('user-1', 'wakac:*');
+    expect(sql).toContain(
+      "setweight(to_tsvector('simple_unaccent', coalesce(\"title\", '')), 'A')",
+    );
+    expect(sql).toContain("setweight(to_tsvector('simple_unaccent', \"content\"), 'B')");
+    expect(sql).toContain('AS "rank"');
+  });
+
   it('scopes the search to the user', async () => {
     const { sql } = await runSearch('user-1', 'docker');
     expect(sql).toContain('"userId" =');
