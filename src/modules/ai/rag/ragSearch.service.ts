@@ -27,7 +27,7 @@ export class RagSearchService {
   async search(userId: string, query: string, limit = this.config.rag.topK): Promise<RagHit[]> {
     if (!this.enabled || !query.trim()) return [];
 
-    const [vector] = await this.embeddings.embed([query]);
+    const [vector] = await this.embeddings.embed([query], undefined, 'query');
     const hits = await this.repository.search(userId, this.embeddings.model, vector, limit);
     return hits.filter((hit) => hit.score >= this.config.rag.minScore);
   }

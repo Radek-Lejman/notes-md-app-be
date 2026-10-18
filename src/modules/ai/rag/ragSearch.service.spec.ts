@@ -30,7 +30,7 @@ describe('RagSearchService', () => {
 
   it("embeds the query and searches the user's chunks of the current model", async () => {
     await expect(makeService().search('user-1', 'deploy')).resolves.toEqual([hit(0.9)]);
-    expect(embed).toHaveBeenCalledWith(['deploy']);
+    expect(embed).toHaveBeenCalledWith(['deploy'], undefined, 'query');
     expect(search).toHaveBeenCalledWith('user-1', 'bge-m3', [0.1, 0.2], 5);
   });
 

@@ -37,6 +37,17 @@ export interface OllamaEmbeddingConfig {
   timeoutMs: number;
 }
 
+export interface LocalEmbeddingConfig {
+  /** Hugging Face model id (ONNX), run in-process by @huggingface/transformers. */
+  model: string;
+  /** Where downloaded models are kept; unset = the library default (node_modules cache). */
+  cacheDir?: string;
+  /** Per request; the first one may include the model download. */
+  timeoutMs: number;
+  /** The model runs in a child process that exits after this long without requests. */
+  idleMs: number;
+}
+
 export interface AiConfig {
   /** Active provider for simple completions. */
   llmProvider: LlmProviderName;
@@ -50,6 +61,7 @@ export interface AiConfig {
     'claude-agent-sdk': ClaudeAgentSdkConfig;
     ollama: OllamaConfig;
     'ollama-embedding': OllamaEmbeddingConfig;
+    'local-embedding': LocalEmbeddingConfig;
   };
 }
 
@@ -89,6 +101,14 @@ export function loadAiConfig(): AiConfig {
         baseUrl: envString('RAG_OLLAMA_URL', { default: ollamaUrl }),
         model: envString('RAG_EMBEDDING_MODEL', { default: 'bge-m3' }),
         timeoutMs: envNumber('RAG_EMBEDDING_TIMEOUT_MS', { default: 60_000, min: 1_000 }),
+      },
+      'local-embedding': {
+        model: envString('RAG_LOCAL_EMBEDDING_MODEL', {
+          default: 'Xenova/multilingual-e5-small',
+        }),
+        cacheDir: process.env.RAG_LOCAL_MODEL_DIR ? envString('RAG_LOCAL_MODEL_DIR') : undefined,
+        timeoutMs: envNumber('RAG_EMBEDDING_TIMEOUT_MS', { default: 60_000, min: 1_000 }),
+        idleMs: envNumber('RAG_LOCAL_IDLE_MS', { default: 600_000, min: 1_000 }),
       },
     },
   };

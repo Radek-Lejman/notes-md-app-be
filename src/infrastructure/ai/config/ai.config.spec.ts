@@ -16,6 +16,9 @@ const AI_ENV_KEYS = [
   'RAG_OLLAMA_URL',
   'RAG_EMBEDDING_MODEL',
   'RAG_EMBEDDING_TIMEOUT_MS',
+  'RAG_LOCAL_EMBEDDING_MODEL',
+  'RAG_LOCAL_MODEL_DIR',
+  'RAG_LOCAL_IDLE_MS',
 ];
 
 describe('loadAiConfig', () => {
@@ -50,6 +53,12 @@ describe('loadAiConfig', () => {
           model: 'bge-m3',
           timeoutMs: 60_000,
         },
+        'local-embedding': {
+          model: 'Xenova/multilingual-e5-small',
+          cacheDir: undefined,
+          timeoutMs: 60_000,
+          idleMs: 600_000,
+        },
       },
     });
   });
@@ -70,12 +79,16 @@ describe('loadAiConfig', () => {
       RAG_OLLAMA_URL: 'http://embed:2',
       RAG_EMBEDDING_MODEL: 'nomic-embed-text',
       RAG_EMBEDDING_TIMEOUT_MS: '8000',
+      RAG_EMBEDDING_PROVIDER: 'local',
+      RAG_LOCAL_EMBEDDING_MODEL: 'Xenova/paraphrase-multilingual-MiniLM-L12-v2',
+      RAG_LOCAL_MODEL_DIR: '/models',
+      RAG_LOCAL_IDLE_MS: '5000',
     });
 
     expect(loadAiConfig()).toEqual({
       llmProvider: 'ollama',
       agentProvider: 'ollama',
-      embeddingProvider: 'ollama',
+      embeddingProvider: 'local',
       providers: {
         'claude-cli': { bin: '/bin/claude', model: 'opus', timeoutMs: 5000 },
         'claude-agent-sdk': { model: 'opus', maxTurns: 3, timeoutMs: 6000 },
@@ -90,6 +103,12 @@ describe('loadAiConfig', () => {
           baseUrl: 'http://embed:2',
           model: 'nomic-embed-text',
           timeoutMs: 8000,
+        },
+        'local-embedding': {
+          model: 'Xenova/paraphrase-multilingual-MiniLM-L12-v2',
+          cacheDir: '/models',
+          timeoutMs: 8000,
+          idleMs: 5000,
         },
       },
     });
