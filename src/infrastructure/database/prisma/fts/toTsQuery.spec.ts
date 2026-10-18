@@ -29,4 +29,24 @@ describe('toTsQuery', () => {
       expect(toTsQuery(input)).toBeUndefined();
     },
   );
+
+  describe("'any' mode (natural questions)", () => {
+    it('joins words with OR and drops words shorter than 3 characters', () => {
+      expect(toTsQuery('gdzie jedziemy na wakacje w 2026?', 'any')).toBe(
+        'gdzie:* | jedziemy:* | wakacje:* | 2026:*',
+      );
+    });
+
+    it('counts characters, not UTF-16 units', () => {
+      expect(toTsQuery('żó ąęś', 'any')).toBe('ąęś:*');
+    });
+
+    it('keeps upper-case two-letter acronyms', () => {
+      expect(toTsQuery('AI w JS i Go na m2', 'any')).toBe('AI:* | JS:*');
+    });
+
+    it('returns undefined when only short words remain', () => {
+      expect(toTsQuery('a w na', 'any')).toBeUndefined();
+    });
+  });
 });

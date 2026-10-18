@@ -89,6 +89,27 @@ export class RagRepository {
       LIMIT ${limit}`;
   }
 
+  /**
+   * Chunks of ONE user's notes matching a `toTsQuery()` query, best `ts_rank_cd` first.
+   * The expression must match the NoteChunk_content_fts_idx index (diacritics ignored).
+   */
+  keywordSearch(userId: string, model: string, tsQuery: string, limit: number): Promise<RagHit[]> {
+    return this.prisma.$queryRaw<RagHit[]>`
+      SELECT c."noteId", n."title", c."headingPath", c."content",
+        ts_rank_cd(
+          to_tsvector('simple_unaccent', c."headingPath" || ' ' || c."content"),
+          to_tsquery('simple_unaccent', ${tsQuery})
+        )::float8 AS "score"
+      FROM "NoteChunk" c
+      JOIN "Note" n ON n."id" = c."noteId" AND n."userId" = ${userId}
+      WHERE c."userId" = ${userId}
+        AND c."model" = ${model}
+        AND to_tsvector('simple_unaccent', c."headingPath" || ' ' || c."content")
+          @@ to_tsquery('simple_unaccent', ${tsQuery})
+      ORDER BY "score" DESC
+      LIMIT ${limit}`;
+  }
+
   async stats(userId: string, model: string): Promise<RagIndexStats> {
     const [row] = await this.prisma.$queryRaw<
       { totalNotes: bigint; indexedNotes: bigint; chunks: bigint }[]

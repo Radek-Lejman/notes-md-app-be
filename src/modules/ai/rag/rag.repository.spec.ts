@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from 'fs';
+import { join } from 'path';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@database/prisma';
 import { RagRepository, toVectorLiteral, utcTimestamp } from './rag.repository';
@@ -153,6 +155,47 @@ describe('RagRepository', () => {
       const userId = `x' OR '1'='1`;
       await repository.search(userId, 'bge-m3', [1], 1);
       expect(asSql(queryRaw.mock.calls[0]).text).not.toContain(userId);
+    });
+  });
+
+  describe('keywordSearch', () => {
+    it("searches only the user's chunks of the current model, best rank first", async () => {
+      await repository.keywordSearch('user-1', 'bge-m3', 'wakac:* | morze:*', 4);
+
+      const { text, values } = asSql(queryRaw.mock.calls[0]);
+      expect(text).toContain('n."userId" = ?');
+      expect(text).toContain('WHERE c."userId" = ?');
+      expect(text).toContain('c."model" = ?');
+      expect(text).toContain('ORDER BY "score" DESC');
+      expect(values).toEqual([
+        'wakac:* | morze:*',
+        'user-1',
+        'user-1',
+        'bge-m3',
+        'wakac:* | morze:*',
+        4,
+      ]);
+    });
+
+    // Postgres only uses the GIN index when the query repeats the indexed expression exactly.
+    it('repeats the expression of NoteChunk_content_fts_idx', async () => {
+      const dir = join(__dirname, '../../../../prisma/migrations');
+      const migration = readdirSync(dir)
+        .map((name) => join(dir, name, 'migration.sql'))
+        .filter((file) => {
+          try {
+            return readFileSync(file, 'utf8').includes('NoteChunk_content_fts_idx');
+          } catch {
+            return false;
+          }
+        })
+        .map((file) => normalize(readFileSync(file, 'utf8')))
+        .pop()!;
+      const indexed = /USING GIN \((.*)\);/.exec(migration)![1];
+
+      await repository.keywordSearch('user-1', 'm', 'x:*', 1);
+      const { text } = asSql(queryRaw.mock.calls[0]);
+      expect(text).toContain(indexed.replace(/"(headingPath|content)"/g, 'c."$1"'));
     });
   });
 

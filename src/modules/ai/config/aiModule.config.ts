@@ -19,6 +19,8 @@ export interface RagConfig {
   minScore: number;
   /** Chunks put into the prompt up front for every question; 0 = tool only. */
   autoContextK: number;
+  /** Fuse semantic and keyword results (rag/hybridSearch.ts); false = semantic only. */
+  hybrid: boolean;
   indexIntervalMs: number;
   /** A note is indexed only after it was not edited for this long (autosave bursts). */
   indexDebounceMs: number;
@@ -70,6 +72,7 @@ export function loadAiModuleConfig(): AiModuleConfig {
       topK: envNumber('RAG_TOP_K', { default: 6, min: 1, max: 30 }),
       minScore: envNumber('RAG_MIN_SCORE', { default: 0.45, min: 0, max: 1 }),
       autoContextK: envNumber('RAG_AUTO_CONTEXT_K', { default: 4, min: 0, max: 20 }),
+      hybrid: envBoolean('RAG_HYBRID', { default: true }),
       indexIntervalMs: envNumber('RAG_INDEX_INTERVAL_MS', { default: 30_000, min: 1_000 }),
       indexDebounceMs: envNumber('RAG_INDEX_DEBOUNCE_MS', { default: 10_000, min: 0 }),
       indexBatchSize: envNumber('RAG_INDEX_BATCH_SIZE', { default: 20, min: 1, max: 500 }),

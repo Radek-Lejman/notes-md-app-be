@@ -3,6 +3,8 @@ import { EMBEDDING_PROVIDER, EmbeddingProvider } from '@ai';
 import { AI_MODULE_CONFIG, AiModuleConfig } from '../config/aiModule.config';
 import { RagRepository } from './rag.repository';
 import { RagHit } from './rag.types';
+import { fuseRrf } from './hybridSearch';
+import { toTsQuery } from '@database/prisma';
 
 /** Semantic search over one user's notes. */
 @Injectable()
@@ -23,13 +25,24 @@ export class RagSearchService {
     return this.embeddings.model;
   }
 
-  /** Chunks scoring at least RAG_MIN_SCORE, best first. Empty when RAG is disabled. */
+  /**
+   * Chunks scoring at least RAG_MIN_SCORE, best first. With RAG_HYBRID, fused with keyword
+   * matches of the same question (rag/hybridSearch.ts). Empty when RAG is disabled.
+   */
   async search(userId: string, query: string, limit = this.config.rag.topK): Promise<RagHit[]> {
     if (!this.enabled || !query.trim()) return [];
 
+    const model = this.embeddings.model;
     const [vector] = await this.embeddings.embed([query], undefined, 'query');
-    const hits = await this.repository.search(userId, this.embeddings.model, vector, limit);
-    return hits.filter((hit) => hit.score >= this.config.rag.minScore);
+    const semantic = (await this.repository.search(userId, model, vector, limit)).filter(
+      (hit) => hit.score >= this.config.rag.minScore,
+    );
+
+    const tsQuery = this.config.rag.hybrid ? toTsQuery(query, 'any') : undefined;
+    if (!tsQuery) return semantic;
+
+    const keyword = await this.repository.keywordSearch(userId, model, tsQuery, limit);
+    return fuseRrf([semantic, keyword], limit);
   }
 
   /** Like search, but never fails (for optional prompt context). */
