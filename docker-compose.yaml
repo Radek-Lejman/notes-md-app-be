@@ -32,7 +32,6 @@ services:
         echo '⏳ Waiting for DB...';
         node -e 'require(\"net\").connect(5432, \"db\").on(\"connect\",()=>process.exit(0)).on(\"error\",()=>process.exit(1))' || exit 1;
         npx prisma generate &&
-        npm run db:backfill-content-md &&
         npx prisma migrate deploy &&
         echo '✅ Prisma ready'
       "

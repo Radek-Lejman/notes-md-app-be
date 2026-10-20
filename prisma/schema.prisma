@@ -43,23 +43,19 @@ model AiCredential {
 }
 
 model NoteVersion {
-  id            String   @id @default(uuid())
-  note          Note     @relation(fields: [noteId], references: [id])
-  noteId        String
-  content       String // markdown snapshot
-  /// Pre-markdown Tiptap JSON, kept for rollback. Drop once the migration is confirmed.
-  contentLegacy Json?    @map("content_legacy")
-  createdAt     DateTime @default(now())
+  id        String   @id @default(uuid())
+  note      Note     @relation(fields: [noteId], references: [id])
+  noteId    String
+  content   String // markdown snapshot
+  createdAt DateTime @default(now())
 }
 
 model Note {
-  id            String   @id @default(uuid())
-  title         String
-  content       String // markdown
-  /// Pre-markdown Tiptap JSON, kept for rollback. Drop once the migration is confirmed.
-  contentLegacy Json?    @map("content_legacy")
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id        String   @id @default(uuid())
+  title     String
+  content   String // markdown
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user   User   @relation(fields: [userId], references: [id])
   userId String

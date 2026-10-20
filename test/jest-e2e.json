@@ -17,7 +17,6 @@
     "^@common(.*)$": "<rootDir>/../src/common$1",
     "^@database(.*)$": "<rootDir>/../src/infrastructure/database$1",
     "^src/(.*)$": "<rootDir>/../src/$1",
-    "^marked$": "<rootDir>/../node_modules/marked/lib/marked.umd.js",
     "^@anthropic-ai/claude-agent-sdk$": "<rootDir>/../src/__mocks__/@anthropic-ai/claude-agent-sdk.ts"
   }
 }
