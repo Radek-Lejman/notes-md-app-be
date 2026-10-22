@@ -73,6 +73,8 @@ Tag: **[enforced: …]** = a tool blocks it; **[described]** = only this file.
 
 ## Where to look
 
-- `docs/ai-dev-system/` — the AI workflow (KONCEPCJA) and git hooks.
+- `docs/ai-dev-system/` — the AI workflow (`CONCEPT.md`), git hooks, CI, phase 2.
+- `docs/adr/` — architecture decision records.
 - `docs/testing/README.md` — test strategy, defects D*.
+- Docs are written in English.
 - `.claude/hooks/` — Claude Code hooks (tests: `node --test .claude/hooks/`).

@@ -1,172 +1,200 @@
-# Testy BE — co nie jest pokryte i dlaczego
+# BE tests — what is not covered and why
 
-Stan: 2026-10-12 · 73 pliki, 804 testy · pokrycie: **96,2% instrukcji · 94,6% gałęzi · 96,0% funkcji** · `test:ai` 100%
+State: 2026-10-12 · 73 files, 804 tests · coverage: **96.2% statements · 94.6% branches · 96.0% functions** · `test:ai` 100%
 
-Pełny audyt (wymagania, koncepcja, znalezione defekty): [AUDYT-TESTOW-JEDNOSTKOWYCH.md](./AUDYT-TESTOW-JEDNOSTKOWYCH.md).
-Odpowiednik na FE: `notes-app-fe/docs/testing/README.md` (ta sama struktura kategorii A–E).
+Full audit (requirements, approach, defects found): [UNIT-TEST-AUDIT.md](./UNIT-TEST-AUDIT.md).
+FE counterpart: `notes-app-fe/docs/testing/README.md` (the same A–E category structure).
 
-## Uruchamianie
+## Running
 
 ```bash
-npm test                # jest, testy jednostkowe (~10 s)
-npm run test:cov        # + coverage (konsola + raport HTML w coverage/)
-npm run test:ai         # moduł AI z progiem 100% — musi być zielony
-npm run test:e2e        # e2e — dziś niedziałające, patrz sekcja A.3
+npm test                # jest, unit tests (~10 s)
+npm run test:cov        # + coverage (console + HTML report in coverage/)
+npm run test:ai         # AI module with a 100% threshold — must be green
+npm run test:e2e        # e2e on Postgres: locally `docker compose up -d db` (the notes_e2e database creates itself), see A.3
 ```
 
-Infrastruktura testowa:
+Test infrastructure:
 
-| Plik | Rola |
+| File | Role |
 |---|---|
-| `test/unit-env.setup.ts` | jest `setupFiles`: stałe sekrety JWT, żeby testy nie zależały od lokalnego `.env` |
-| `src/common/testing/http-test.utils.ts` | `makeHttpContext`, `makeResponse`: ExecutionContext / ArgumentsHost / Response dla guardów, filtrów i dekoratorów |
-| `src/infrastructure/ai/testing/ai-test.utils.ts` | `makeAiConfig`, `streamOf`, `collect`: providerzy AI bez sieci |
-| `src/__mocks__/@anthropic-ai/claude-agent-sdk.ts` | mock SDK Claude |
+| `test/unit-env.setup.ts` | jest `setupFiles`: fixed JWT secrets so tests do not depend on the local `.env` |
+| `src/common/testing/http-test.utils.ts` | `makeHttpContext`, `makeResponse`: ExecutionContext / ArgumentsHost / Response for guards, filters and decorators |
+| `src/infrastructure/ai/testing/ai-test.utils.ts` | `makeAiConfig`, `streamOf`, `collect`: AI providers without a network |
+| `src/__mocks__/@anthropic-ai/claude-agent-sdk.ts` | Claude SDK mock |
 
-## Zasada
+## Principle
 
-Celem nie jest 100%. Coverage pokazuje, które linie się wykonały, a nie czy zachowanie zostało sprawdzone. Ostatnie procenty zwykle dobija się testami bez wartości (`KONCEPCJA.md` §4). Wyjątkiem jest `test:ai`, gdzie 100% to świadomie przyjęta bramka. Każde niepokryte miejsce należy do jednej z kategorii poniżej i każda kategoria ma swoją decyzję.
+The goal is not 100%. Coverage shows which lines ran, not whether the behaviour was checked. The last percent is usually reached with worthless tests (`CONCEPT.md` §4). The exception is `test:ai`, where 100% is a deliberately chosen gate. Every uncovered spot belongs to one of the categories below, and every category has its decision.
 
-| Kategoria | Decyzja |
+| Category | Decision |
 |---|---|
-| A. Wymaga prawdziwej bazy lub całego pipeline'u HTTP | **testy e2e / integracyjne** (`test/`), nie unit |
-| B. Konfiguracja aplikacji (composition root) | bez testów jednostkowych; start aplikacji sprawdza smoke e2e |
-| C. Martwy lub niedokończony kod | usunąć albo dokończyć, nie testować |
-| D. Gałęzie obronne | świadomie bez testów |
-| E. Realna logika bez testu | **kandydaci do uzupełnienia** |
+| A. Needs a real database or the whole HTTP pipeline | **e2e / integration tests** (`test/`), not unit |
+| B. App configuration (composition root) | no unit tests; app startup is checked by an e2e smoke test |
+| C. Dead or unfinished code | delete or finish it, do not test it |
+| D. Defensive branches | deliberately untested |
+| E. Real logic without a test | **candidates to add** |
 
-## A. Wymaga prawdziwej bazy / pipeline'u HTTP → e2e
+## A. Needs a real database / HTTP pipeline → e2e
 
-To odpowiednik FE-owej kategorii „wymaga prawdziwej przeglądarki → Playwright”. Na BE rolę jsdom pełni mock Prismy: test jednostkowy sprawdza, że do bazy trafia właściwe zapytanie (`where: { userId }`, parametry zamiast inline SQL). Nie sprawdzi natomiast, co Postgres z tym zapytaniem zrobi. Tak samo kontroler wywołany wprost w teście pomija middleware, guardy globalne, `ValidationPipe` i filtry wyjątków, czyli wszystko, co ustawia `main.ts` i `app.module.ts`. Podmienianie tych rzeczy w unicie sprawdzałoby podmiany, a nie aplikację.
+This is the counterpart of the FE category "needs a real browser → Playwright". On the BE the role of jsdom is played by the Prisma mock: a unit test checks that the right query reaches the database (`where: { userId }`, parameters instead of inline SQL). It will not check what Postgres does with that query. Likewise, a controller called directly in a test skips middleware, global guards, `ValidationPipe` and exception filters — everything set up by `main.ts` and `app.module.ts`. Replacing those in a unit test would test the replacements, not the app.
 
-### A.1 Czego unit nie sprawdzi i gdzie to będzie
+### A.1 What a unit test cannot check and where it will be
 
-| Obszar | Czego nie da się sprawdzić unitem | Co jest już pokryte unitem | Plik e2e (plan) |
+| Area | What cannot be checked with a unit test | What is already covered by unit tests | e2e file (plan) |
 |---|---|---|---|
-| **Autoryzacja B→A** (`KONCEPCJA` §2, obowiązkowa) | że użytkownik B naprawdę dostaje 404 na notatce A: wymaga dwóch kont, prawdziwego JWT w cookie i bazy | każde zapytanie w `NotesService` ma `userId` w `where`, a `RagRepository` filtruje `userId` w SQL (`notes.service.spec`, `rag.repository.spec`) | `notes.authz.e2e-spec.ts` |
-| **PATCH cudzej notatki** (D5, naprawione) i **`parentId` cudzej notatki** (D14, naprawione) | Prisma `P2025` → **404**; `parent.connect` zawęża do `{ id, userId }` | serwis mapuje `P2025` na `NotFoundException` (`notes.service.spec` › *D5*, *D14*) | `notes.authz.e2e-spec.ts` |
-| **Full-text search** | że `plainto_tsquery` + indeksy GIN zwracają właściwe notatki, w tym prefiksy, polskie znaki i paginację kursorem | sanityzacja zapytania (`toTsQuery.spec`), wyrażenie SQL identyczne z indeksem z migracji (`notesPgRepository.spec`) | `notes.search.e2e-spec.ts` |
-| **`order=rank` z samotnym `-`** (D13) | czy `to_tsquery('… & -:*')` w `_relevance` nie zwraca błędu składni → 500 | `toTsQuery` przepuszcza `-:*` (`toTsQuery.spec`) | `notes.search.e2e-spec.ts` |
-| **pgvector / RAG** | cosine search, `vector_dims`, transakcja DELETE→INSERT→UPDATE, warunek `ragIndexedAt = updatedAt` przy strefie czasowej ≠ UTC | kształt i parametry każdego zapytania (`rag.repository.spec`), logika indeksera (`ragIndexer.service.spec`) | `rag.integration-spec.ts` |
-| **`PrismaService.omit`** | że `contentLegacy` i `ragIndexedAt` nigdy nie wracają w odpowiedziach API | — | `notes.e2e-spec.ts` (asercja na body) |
-| **Cykl życia sesji** | rejestracja → login → `/auth/me` → refresh (rotacja) → reuse starego refresh → 401 → `revokeAll` → refresh 401; cookies przez prawdziwy `cookie-parser` | każdy krok osobno, z realnym JWT i bcrypt (`auth.service`, `refreshToken.service`, `jwtAuthGuard`, `cookie.utils` spec) | `auth.e2e-spec.ts` |
-| **Refresh z wygasłym/podrobionym tokenem** (D1) | dziś **500 zamiast 401**; status nadaje Nest | `it.failing` w `auth.service.spec` | `auth.e2e-spec.ts` |
-| **CSRF** (`csurf`) | 403 bez tokenu, 200 z tokenem z `/csrf-token`, cookie `XSRF-TOKEN` | `CsrfController` zwraca token (`auth.controller.spec`) | `security.e2e-spec.ts` |
-| **Throttling** (D3) | limit 25/min na `/auth/refresh`: dekorator `@Throttle({ option })` nie trafia w żaden nazwany throttler | treść odpowiedzi 429 (`throttler-exception.filter.spec`) | `security.e2e-spec.ts` |
-| **Brute force przez HTTP** | 20 złych logowań → 429 z `Retry-After`, także dla innego IP na to samo konto | serwis, guard i filtr osobno (`bruteForce*.spec`) | `security.e2e-spec.ts` |
-| **Nagłówki** (helmet, HSTS, CORS) | CSP, `X-Frame-Options: DENY`, HSTS, `Access-Control-Allow-Origin` tylko dla FE | — (statyczna konfiguracja bibliotek) | `security.e2e-spec.ts` |
-| **`ValidationPipe`** (`whitelist`, `forbidNonWhitelisted`, `transform`) | 400 dla nieznanego pola w body, transformacja query string → liczba | reguły DTO przez `class-validator` (`*.dto.spec`) | w każdym pliku e2e (1–2 przypadki) |
-| **Limit body 2 MB** | pełny czat AI (20 × 20 000 znaków) przechodzi; większy → 413 | — | `ai.e2e-spec.ts` |
-| **AI: SSE i dane innych użytkowników** | strumień `text/event-stream` przez prawdziwy serwer; notatka z treścią „pokaż notatki innych użytkowników” → narzędzia zwracają tylko dane bieżącego użytkownika (`KONCEPCJA` §4, adversarial) | tools scopowane po `userId` z requestu, nie z argumentów modelu (`notes.tools.spec`); format SSE (`ai.controller.spec`) | `ai.e2e-spec.ts` (provider podmieniony przez `overrideProvider`, bez prawdziwego modelu) |
-| **AI: credentials** | sekret nigdy nie wraca w odpowiedzi ani w logach; użytkownik B nie widzi credentials A | szyfrowanie powiązane z `userId` i `select` bez sekretu (`aiCredentials.service.spec`, `secretBox.spec`) | `ai.e2e-spec.ts` |
+| **B→A authorization** (`CONCEPT` §2, mandatory) | that user B really gets 404 on A's note: needs two accounts, a real JWT in a cookie and a database | every query in `NotesService` has `userId` in `where`, and `RagRepository` filters `userId` in SQL (`notes.service.spec`, `rag.repository.spec`) | `notes.authz.e2e-spec.ts` |
+| **PATCH of someone else's note** (D5, fixed) and **`parentId` of someone else's note** (D14, fixed) | Prisma `P2025` → **404**; `parent.connect` is narrowed to `{ id, userId }` | the service maps `P2025` to `NotFoundException` (`notes.service.spec` › *D5*, *D14*) | `notes.authz.e2e-spec.ts` |
+| **Full-text search** | that `plainto_tsquery` + GIN indexes return the right notes, including prefixes, Polish characters and cursor pagination | query sanitization (`toTsQuery.spec`), the SQL expression identical to the migration's index (`notesPgRepository.spec`) | `notes.search.e2e-spec.ts` |
+| **`order=rank` with a lone `-`** (D13) | whether `to_tsquery('… & -:*')` in `_relevance` does not raise a syntax error → 500 | `toTsQuery` lets `-:*` through (`toTsQuery.spec`) | `notes.search.e2e-spec.ts` |
+| **pgvector / RAG** | cosine search, `vector_dims`, the DELETE→INSERT→UPDATE transaction, the `ragIndexedAt = updatedAt` condition with a time zone ≠ UTC | the shape and parameters of every query (`rag.repository.spec`), the indexer logic (`ragIndexer.service.spec`) | `rag.integration-spec.ts` |
+| **`PrismaService.omit`** | that `contentLegacy` (dropped in `0ee4ca9`) and `ragIndexedAt` never come back in API responses | — | `notes.e2e-spec.ts` (assertion on the body) |
+| **Session lifecycle** | register → login → `/auth/me` → refresh (rotation) → reuse of the old refresh → 401 → `revokeAll` → refresh 401; cookies through the real `cookie-parser` | each step separately, with real JWT and bcrypt (`auth.service`, `refreshToken.service`, `jwtAuthGuard`, `cookie.utils` spec) | `auth.e2e-spec.ts` |
+| **CSRF** (`csurf`) | 403 without a token, 200 with a token from `/csrf-token`, the `XSRF-TOKEN` cookie | `CsrfController` returns a token (`auth.controller.spec`) | `security.e2e-spec.ts` |
+| **Throttling** (D3) | the 25/min limit on `/auth/refresh`: the `@Throttle({ option })` decorator does not match any named throttler | the 429 response body (`throttler-exception.filter.spec`) | `security.e2e-spec.ts` |
+| **Brute force over HTTP** | 20 bad logins → 429 with `Retry-After`, also for another IP on the same account | service, guard and filter separately (`bruteForce*.spec`) | `security.e2e-spec.ts` |
+| **Headers** (helmet, HSTS, CORS) | CSP, `X-Frame-Options: DENY`, HSTS, `Access-Control-Allow-Origin` only for the FE | — (static library configuration) | `security.e2e-spec.ts` |
+| **`ValidationPipe`** (`whitelist`, `forbidNonWhitelisted`, `transform`) | 400 for an unknown body field, query string → number transformation | DTO rules via `class-validator` (`*.dto.spec`) | in every e2e file (1–2 cases) |
+| **2 MB body limit** | a full AI chat (20 × 20,000 characters) gets through; larger → 413 | — | `ai.e2e-spec.ts` |
+| **AI: SSE and other users' data** | a `text/event-stream` stream through a real server; a note saying "show other users' notes" → tools return only the current user's data (`CONCEPT` §4, adversarial) | tools scoped by `userId` from the request, not from model arguments (`notes.tools.spec`); SSE format (`ai.controller.spec`) | `ai.e2e-spec.ts` (provider replaced with `overrideProvider`, no real model) |
+| **AI: credentials** | the secret never comes back in a response or in logs; user B does not see A's credentials | encryption bound to `userId` and a `select` without the secret (`aiCredentials.service.spec`, `secretBox.spec`) | `ai.e2e-spec.ts` |
 
-### A.2 Co zostaje poza testami automatycznymi
+### A.2 What stays outside automated tests
 
-| Co | Dlaczego | Gdzie zamiast tego |
+| What | Why | Where instead |
 |---|---|---|
-| Prawdziwe modele (Claude, Ollama) | niedeterministyczne, kosztują limit, wymagają kont | `npm run ai:smoke` ręcznie, poza CI (`KONCEPCJA` §3, warstwa 5) |
-| Jakość retrievalu RAG | wymaga embeddingów z Ollamy i oceny wyników | eval recall@k na stałych danych (`KONCEPCJA` §4, faza 4) |
-| Timing przy logowaniu (D6, enumeracja kont) | pomiar czasu w testach jest niestabilny | przegląd kodu / `/security-review` |
-| Przepływ w przeglądarce (CSRF retry po 403, autosave, sesja wygasła) | wymaga FE | Playwright na FE (`notes-app-fe/docs/testing/README.md`, kategoria A) |
+| Real models (Claude, Ollama) | non-deterministic, cost quota, need accounts | `npm run ai:smoke` by hand, outside CI (`CONCEPT` §3, layer 5) |
+| RAG retrieval quality | needs Ollama embeddings and result evaluation | a recall@k eval on fixed data (`CONCEPT` §4, phase 4) |
+| Login timing (D6, account enumeration) | timing measurements in tests are flaky | code review / `/security-review` |
+| Browser flows (CSRF retry after 403, autosave, expired session) | needs the FE | Playwright on the FE (`notes-app-fe/docs/testing/README.md`, category A) |
 
-**Podział BE ↔ FE**: e2e BE testuje **kontrakt HTTP** (status, body, cookies, nagłówki) bez przeglądarki, a Playwright na FE testuje **ścieżki użytkownika** w przeglądarce. Scenariusze, które dotykają obu stron, jak ponawianie po 403 CSRF (defekt D1 na FE) czy wylogowanie po nieudanym refreshu, sprawdzamy na FE. BE dostarcza tylko pewność, że po swojej stronie zwraca właściwe kody (`security.e2e-spec.ts`, `auth.e2e-spec.ts`).
+**BE ↔ FE split**: BE e2e tests the **HTTP contract** (status, body, cookies, headers) without a browser, and Playwright on the FE tests **user paths** in a browser. Scenarios touching both sides, such as retrying after a CSRF 403 (FE defect D1) or logging out after a failed refresh, are tested on the FE. The BE only provides confidence that it returns the right codes on its side (`security.e2e-spec.ts`, `auth.e2e-spec.ts`).
 
-### A.3 Infrastruktura e2e — stan i co trzeba zrobić
+### A.3 e2e infrastructure — state and what needs doing
 
-Dziś `npm run test:e2e` nie działa: `test/app.e2e-spec.ts` ma błąd TS, oczekuje `"Hello World!"` i nie ma bazy. To jest faza 0/1 w `KONCEPCJA` §8.
+**State 2026-10-13: steps 1–4 and 6 done** (details and deviations: `docs/ai-dev-system/CI.md` §4, §11). Step 5 (AI provider fakes) — with the first `ai.e2e-spec.ts`. Safety check: e2e refuses to run on a database whose name does not end with `_e2e`/`_test`.
 
-| Krok | Szczegóły |
+| Step | Details |
 |---|---|
-| 1. `test/jest-e2e.json` | dodać `moduleNameMapper` (aliasy `@ai`, `@core`, `@security`, `@common`, `@database`, `src/`, tak jak w `package.json`) i `setupFiles: ["<rootDir>/unit-env.setup.ts"]` |
-| 2. Wspólny bootstrap | wydzielić z `main.ts` funkcję `configureApp(app)` (prefix `/api`, `cookieParser`, `csrf`, CORS, helmet, `ValidationPipe`, limit body). Bez tego e2e testowałoby **inną** aplikację niż produkcyjna. To zmiana w kodzie produkcyjnym i wymaga zgody. |
-| 3. Baza | `pgvector/pgvector:pg15` (jak w `docker-compose.yaml`), osobna baza `notes_e2e`, `prisma migrate deploy` przed suitem, `TRUNCATE` tabel między testami (`globalSetup` / `beforeEach`) |
-| 4. Helpery `test/support/` | `createTestApp()`, `registerUser(app)` → agent supertest z cookies, `csrf(agent)` → nagłówek `X-CSRF-Token` |
-| 5. AI bez sieci | `overrideProvider(AGENT_PROVIDER / LLM_PROVIDER / EMBEDDING_PROVIDER)` z deterministycznymi fake'ami; `RAG_INDEX_INTERVAL_MS` duże, indeksowanie wywoływane ręcznie |
-| 6. CI | job `e2e` z serwisem Postgres (`KONCEPCJA` §3.3) |
+| 1. `test/jest-e2e.json` | add `moduleNameMapper` (aliases `@ai`, `@core`, `@security`, `@common`, `@database`, `src/`, as in `package.json`) and `setupFiles: ["<rootDir>/unit-env.setup.ts"]` |
+| 2. Shared bootstrap | extract a `configureApp(app)` function from `main.ts` (`/api` prefix, `cookieParser`, `csrf`, CORS, helmet, `ValidationPipe`, body limit). Without it e2e would test a **different** app than production. This is a production code change and needs approval. |
+| 3. Database | `pgvector/pgvector:pg15` (as in `docker-compose.yaml`), a separate `notes_e2e` database, `prisma migrate deploy` before the suite, `TRUNCATE` of tables between tests (`globalSetup` / `beforeEach`) |
+| 4. `test/support/` helpers | `createTestApp()`, `registerUser(app)` → a supertest agent with cookies, `csrf(agent)` → the `X-CSRF-Token` header |
+| 5. AI without a network | `overrideProvider(AGENT_PROVIDER / LLM_PROVIDER / EMBEDDING_PROVIDER)` with deterministic fakes; a large `RAG_INDEX_INTERVAL_MS`, indexing triggered by hand |
+| 6. CI | an `e2e` job with a Postgres service (`CONCEPT` §3.3) |
 
-Docelowy układ, analogiczny do FE (`src/shared/lib/test/`), tylko w `test/`:
+Target layout, analogous to the FE (`src/shared/lib/test/`), only in `test/`:
 
 ```
 test/
 ├── jest-e2e.json
-├── unit-env.setup.ts          # już jest (unit); wspólny z e2e
+├── unit-env.setup.ts          # already exists (unit); shared with e2e
 ├── support/                   # createTestApp, registerUser, csrf, db reset
-├── app.e2e-spec.ts            # smoke: aplikacja startuje, /api odpowiada
+├── app.e2e-spec.ts            # smoke: the app starts, /api responds
 ├── auth.e2e-spec.ts
 ├── notes.e2e-spec.ts
-├── notes.authz.e2e-spec.ts    # B→A dla każdego endpointu z :id
+├── notes.authz.e2e-spec.ts    # B→A for every endpoint with :id
 ├── notes.search.e2e-spec.ts
 ├── security.e2e-spec.ts
 ├── ai.e2e-spec.ts
 └── rag.integration-spec.ts
 ```
 
-## B. Konfiguracja aplikacji (composition root)
+## B. App configuration (composition root)
 
-| Plik | Pokrycie | Dlaczego bez testów jednostkowych |
+| File | Coverage | Why no unit tests |
 |---|---|---|
-| `main.ts` | 0% | punkt wejścia (middleware, prefix, pipe). Właściwe miejsce to smoke e2e po kroku A.3/2 |
-| `app.module.ts`, `auth.module.ts`, `prisma.module.ts` | 0% | tylko wiring DI. Test jednostkowy powtórzyłby listę providerów, a błąd wiringu i tak wywraca start aplikacji (smoke e2e). Wyjątki z wartością już istnieją: `ai.module.spec`, `ai-infrastructure.module.spec` (wybór providera z env) |
-| `prisma.service.ts` | 50% | `$connect` / `$disconnect` i `omit` działają tylko z prawdziwą bazą → A.1 (*PrismaService.omit*) |
-| `security/config/helmet.config.ts` (6, 24), `csrf.config.ts` (8) | gałęzie prod | `isProd` jest liczone przy imporcie. Sama wartość opcji nic nie mówi, liczą się nagłówki i cookies → `security.e2e-spec.ts` |
-| `index.ts` (barrele), `*.types.ts`, `*.interface.ts`, `express.d.ts` | 0% | brak logiki |
+| `main.ts` | 0% | the entry point (middleware, prefix, pipe). The right place is an e2e smoke test after step A.3/2 |
+| `app.module.ts`, `auth.module.ts`, `prisma.module.ts` | 0% | DI wiring only. A unit test would repeat the provider list, and a wiring error breaks app startup anyway (e2e smoke). Valuable exceptions already exist: `ai.module.spec`, `ai-infrastructure.module.spec` (provider choice from env) |
+| `prisma.service.ts` | 50% | `$connect` / `$disconnect` and `omit` only work with a real database → A.1 (*PrismaService.omit*) |
+| `security/config/helmet.config.ts` (6, 24), `csrf.config.ts` (8) | prod branches | `isProd` is computed at import time. The option value alone says nothing; what matters are headers and cookies → `security.e2e-spec.ts` |
+| `index.ts` (barrels), `*.types.ts`, `*.interface.ts`, `express.d.ts` | 0% | no logic |
 
-## C. Martwy lub niedokończony kod
+## C. Dead or unfinished code
 
-Testowanie tych miejsc utrwaliłoby kod, który powinien zniknąć albo zostać dokończony.
+Testing these spots would cement code that should disappear or be finished.
 
-| Plik / linie | Stan | Decyzja |
+| File / lines | State | Decision |
 |---|---|---|
-| `app.service.ts` (`'XXdddXX!'`), `app.controller.ts` `POST /dashboard` | placeholdery ze scaffoldu (mockowane statystyki), FE ich nie używa | usunąć `/dashboard`; `GET /api` zostawić jako health check z sensowną odpowiedzią |
-| `auth/dto/me.dto.ts`, `auth/dto/refresh.dto.ts` | nigdzie nieimportowane | usunąć |
-| `core/types/env.enum.ts` (`Environment`) | nigdzie nieużywany | usunąć |
-| `refreshToken.serivce.ts` `revokeAll` (D10) | nieużywany: `AuthService.revokeAll` tylko podbija `tokenVersion` | użyć w `AuthService.revokeAll` (porządek w DB) albo usunąć |
-| `throttler-exception.filter.ts` 15 (gałąź `/auth`) | martwa przez prefix `/api` (D4) | poprawić na `/api/auth` przy naprawie D3 |
-| `core/tree/tree.service.ts` 67 (`forEach` bez `startId`) | prywatna gałąź, nikt jej nie wywołuje | zostawić (API drzewa) albo uprościć |
+| `app.service.ts` (`'XXdddXX!'`), `app.controller.ts` `POST /dashboard` | scaffold placeholders (mocked statistics), unused by the FE | delete `/dashboard`; keep `GET /api` as a health check with a meaningful response |
+| `auth/dto/me.dto.ts`, `auth/dto/refresh.dto.ts` | imported nowhere | delete |
+| `core/types/env.enum.ts` (`Environment`) | used nowhere | delete |
+| `refreshToken.serivce.ts` `revokeAll` (D10) | unused: `AuthService.revokeAll` only bumps `tokenVersion` | use it in `AuthService.revokeAll` (DB cleanup) or delete it |
+| `throttler-exception.filter.ts` 15 (the `/auth` branch) | dead because of the `/api` prefix (D4) | change to `/api/auth` when fixing D3 |
+| `core/tree/tree.service.ts` 67 (`forEach` without `startId`) | a private branch nobody calls | keep (tree API) or simplify |
 
-## D. Gałęzie obronne — świadomie bez testów
+## D. Defensive branches — deliberately untested
 
-Zabezpieczenia na sytuacje, które przy obecnym kodzie nie występują. Żeby je przetestować, trzeba by sztucznie zepsuć dane wejściowe, a taki test nie sprawdza zachowania widocznego dla klienta API.
+Safeguards for situations that do not occur with the current code. Testing them would require artificially breaking the input, and such a test does not check behaviour visible to an API client.
 
-| Plik / linie | Gałąź | Dlaczego nie występuje |
+| File / lines | Branch | Why it does not occur |
 |---|---|---|
-| `notesTree.service.ts` 98–99 | dziecko bez `parentId` | zapytanie `parentId IN (...)` nie zwróci `null`, a limiter i tak odrzuca pusty klucz wcześniej (zachowanie sprawdza *skips a child without a parent reference*) |
-| `notesTree.service.ts` 71, `notesSerach.service.ts` 43 | `?? []` po wyniku `NotesService` | `NotesService` zawsze zwraca tablicę |
-| `note.mapper.ts` 17, `notesToTree.ts` 20 | `!prismaNotes`, `children?.` | Prisma `findMany` zawsze zwraca tablicę; węzły drzewa zawsze mają `children` |
-| `core/tree/tree.service.ts` 52 | węzeł (nie root) bez `parentId` | `addChild` zawsze ustawia rodzica |
-| `cookie.utils.ts` 10, 20 | `setAuthCookies` bez access tokenu | każde wywołanie (register, login, refresh) przekazuje oba tokeny; brak refresh tokenu jest testowany |
-| `markdownEscape.ts` 48, 59, `markdownExtensions.ts` 33, 76 | `text ?? ''`, `type ?? ''`, `title` nie-string | parser Tiptapa zawsze ustawia te pola |
-| `tiptapToMarkdown.ts` 51, 78 | dokument legacy bez `content` / z nieznanym rootem | migracja do markdown zakończona; konwerter zostaje tylko na potrzeby backfillu (kandydat do usunięcia razem z `content_legacy`) |
-| `http-test.utils.ts` (`switchToRpc`, `switchToWs`, `getArgs`) | helper testowy | kompletny interfejs `ExecutionContext`; nie jest kodem produkcyjnym |
+| `notesTree.service.ts` 98–99 | a child without `parentId` | the `parentId IN (...)` query does not return `null`, and the limiter rejects an empty key earlier anyway (the behaviour is checked by *skips a child without a parent reference*) |
+| `notesTree.service.ts` 71, `notesSerach.service.ts` 43 | `?? []` after a `NotesService` result | `NotesService` always returns an array |
+| `note.mapper.ts` 17, `notesToTree.ts` 20 | `!prismaNotes`, `children?.` | Prisma `findMany` always returns an array; tree nodes always have `children` |
+| `core/tree/tree.service.ts` 52 | a node (not the root) without `parentId` | `addChild` always sets the parent |
+| `cookie.utils.ts` 10, 20 | `setAuthCookies` without an access token | every call (register, login, refresh) passes both tokens; a missing refresh token is tested |
+| `markdownEscape.ts` 48, 59, `markdownExtensions.ts` 33, 76 | `text ?? ''`, `type ?? ''`, a non-string `title` | the Tiptap parser always sets these fields (BE copy removed in `0ee4ca9`) |
+| `tiptapToMarkdown.ts` 51, 78 | a legacy document without `content` / with an unknown root | the markdown migration is complete; the converter only remained for the backfill (removed together with `content_legacy` in `0ee4ca9`) |
+| `http-test.utils.ts` (`switchToRpc`, `switchToWs`, `getArgs`) | a test helper | a complete `ExecutionContext` interface; not production code |
 
-## E. Realna logika bez testu — kandydaci do uzupełnienia
+## E. Real logic without a test — candidates to add
 
-Te testy są tanie i sprawdzają zachowanie, które zauważy użytkownik. Rekomendacja: dopisać przy najbliższej zmianie w danym pliku.
+These tests are cheap and check behaviour a user would notice. Recommendation: add them with the next change in the given file.
 
-| Plik / linie | Czego nie sprawdzono | Jak przetestować |
+| File / lines | What is not checked | How to test |
 |---|---|---|
-| `markdownExtensions.ts` 41–47 | pusty blok kodu i blok bez języka po zapisie | `markdownExtensions.spec`: round-trip `` ```\n``` `` i `` ```ts\n``` `` |
-| `markdownText.ts` 52–55 | snippet, gdy trafienie jest w długim słowie bez spacji (brak spacji po `start`) | `markdownText.spec`: tekst > 160 znaków bez spacji, trafienie w środku |
+| `markdownExtensions.ts` 41–47 | an empty code block and a block without a language after saving | `markdownExtensions.spec`: round-trip `` ```\n``` `` and `` ```ts\n``` `` |
+| `markdownText.ts` 52–55 | the snippet when the match is inside a long word without spaces (no space after `start`) | `markdownText.spec`: text > 160 characters without spaces, match in the middle |
 
-## Testy znanych defektów (`it.failing`)
+## Known-defect tests (`it.failing`)
 
-Te testy opisują **poprawne** zachowanie i dziś padają, bo w kodzie jest błąd. Są oznaczone `it.failing`, więc zestaw jest zielony, a błąd widoczny. Po naprawie test zacznie failować; wtedy zmień `it.failing` na `it`.
+An `it.failing` test describes the **correct** behaviour and fails today because of a bug in the code. The suite is green and the bug is visible. After the fix the test starts failing; then change `it.failing` to `it`.
 
-| Defekt | Test |
+There are currently no open defects with an `it.failing` test. Fixed (plain `it` today):
+
+| Defect | Test |
 |---|---|
-| D1: refresh z wygasłym/podrobionym tokenem → 500 zamiast 401 | `modules/auth/services/auth.service.spec.ts` |
-| D2: `revokeAll` bez `await` (fałszywe „revoked”, nieobsłużona obietnica) | `modules/auth/controllers/auth.controller.spec.ts` |
-| D11: błędne logowanie w trakcie blokady brute force zdejmuje blokadę | `infrastructure/security/services/bruteForceService.spec.ts` |
-| D12: domyślne sekrety JWT na dev krótsze niż 32 B, więc aplikacja nie startuje | `modules/auth/config/jwt.config.spec.ts` |
+| D5: PATCH of someone else's note → 500 instead of 404 (Prisma `P2025` unmapped) | `test/notes.authz.e2e-spec.ts` |
+| D14: `parentId` without an owner check — B could create a note under A's note (200): a cross-account relation and an id-existence oracle | `test/notes.authz.e2e-spec.ts` |
 
-Defekty, których nie da się sprawdzić unitem (D3, D5, D13), są w tabeli A.1 z docelowym plikiem e2e.
+Defects that cannot be checked with a unit test (D3, D13) are in table A.1 with their target e2e file.
 
-## Znane zachowanie zestawu
+### Covered by e2e
 
-- **Moduły czytające env przy imporcie** (`jwt.config`, `cookie.utils`, `env.ts`, `aiModule.config`) są w testach ładowane przez `jest.isolateModules`, z ustawionym `process.env` dla każdego przypadku. Zwykły `import` na górze pliku odczytałby env tylko raz.
-- **`@prisma/client` ładuje `.env` przy imporcie.** Dlatego istnieje `test/unit-env.setup.ts`: bez niego wynik testów zależałby od tego, czy deweloper ma lokalny `.env`.
-- **Fake timers a `jsonwebtoken`**: w testach z `signAsync` używaj `jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] })`, inaczej podpis nigdy się nie kończy (timeout).
+| Row from A.1 | Test |
+|---|---|
+| B→A authorization (GET `:id`, list, PATCH, `parentId`) | `test/notes.authz.e2e-spec.ts` |
+| PATCH of someone else's note (D5) and `parentId` of someone else's note (D14) | `test/notes.authz.e2e-spec.ts` |
+| App startup with the production pipeline (`configureApp`) | `test/app.e2e-spec.ts` |
+| Refresh with an expired/forged/malformed token → 401 (D1, fixed) | `test/auth.e2e-spec.ts` |
+| Refresh with the old token after `revokeAll` → 401 (D2 fixed, error path in a unit test) | `test/auth.e2e-spec.ts` |
+| Access token after `revokeAll` → 401 immediately (S3 fixed) | `test/auth.e2e-spec.ts` |
 
-## Aktualizacja tego pliku
+## Security backlog (found in reviews on 2026-10-15)
 
-Po większej zmianie uruchom `npm run test:cov` i porównaj z tabelami powyżej. Każde nowe miejsce poniżej ~90% przypisz do kategorii A–E. Jeśli nie pasuje do żadnej, to po prostu brakuje testu. Gdy powstanie infrastruktura e2e (A.3), przenieś zrealizowane wiersze z A.1 do tabeli „pokryte e2e” z nazwą testu.
+Issues without an `it.failing` test — to decide / do later. Fixed ones stay with a note.
+
+| Id | Severity | Problem | Proposal |
+|---|---|---|---|
+| S1 | high | **Fixed** (branch `fix/secrets-and-session-revocation`): `AI_CREDENTIALS_SECRET` had a fallback known from the repo; outside `NODE_ENV=production`, users' AI keys were encrypted with a public key. | Fallback removed; `change-me` placeholders from `.env.example` rejected in production. |
+| S2 | medium | **Fixed** (as above): the same secret for access and refresh → a refresh token (7 days) passes as an access token. | App startup refuses identical secrets. |
+| S3 | medium | **Fixed** (as above): after "log out everywhere" the access token still worked for up to 15 min. | `tokenVersion` in the access token, the guard checks it in the database (1 query per request). |
+| S4 | low | 20 bad passwords for **someone else's** account lock the owner out of login for 2 min, with no repeat limit. | E.g. account lock only combined with IP, CAPTCHA after N attempts, or increasing delay only per IP. |
+| S5 | low | A successful login also resets the IP counter (`resetMany(bfKeys)`) — an attacker with their own account can reset it between attempts. | After success, clear only the account key. |
+| S6 | low | `BruteForceService.attemptsStore` never removes expired entries; an in-memory store, separate per instance. | Periodic cleanup / Redis when scaling. |
+| S7 | info | Dockerfile: `node:20` (while `.nvmrc` = 22), `start:dev`, no `NODE_ENV` — for local work only. | A separate production image before the first deployment. |
+| S8 | info | JWT `verify()` without a pinned `algorithms` list; `JwtAuthGuard` logs the whole error object. | Hardening when convenient. |
+| S9 | high | `npm audit`: 42 existing vulnerabilities in dependencies, incl. `proxy-addr` (critical, IP spoofing), `jws` (JWT HMAC verification), `path-to-regexp`, `multer`. | Dependency updates before deployment (stage 3). |
+| S10 | low | Sorting by relevance (`rank`) has no pagination — the cursor only supports `updatedAt`. | A (rank, id) cursor or offset for ranked results. |
+| S11 | info | A plain "Log out" only clears cookies; a stolen refresh token works until "log out everywhere" or expiry (7 days). | Invalidate the current refresh token (jti) on logout. |
+
+## Known suite behaviour
+
+- **Modules reading env at import time** (`jwt.config`, `cookie.utils`, `env.ts`, `aiModule.config`) are loaded in tests via `jest.isolateModules`, with `process.env` set for each case. A plain `import` at the top of the file would read env only once.
+- **`@prisma/client` loads `.env` at import time.** That is why `test/unit-env.setup.ts` exists: without it the test results would depend on whether the developer has a local `.env`.
+- **Fake timers and `jsonwebtoken`**: in tests with `signAsync` use `jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] })`, otherwise the signature never completes (timeout).
+
+## Updating this file
+
+After a larger change, run `npm run test:cov` and compare with the tables above. Assign every new spot below ~90% to a category A–E. If it does not fit any, a test is simply missing. Once the e2e infrastructure exists (A.3), move the completed rows from A.1 to the "covered by e2e" table with the test name.

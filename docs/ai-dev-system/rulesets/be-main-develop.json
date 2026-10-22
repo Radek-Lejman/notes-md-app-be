@@ -1,0 +1,47 @@
+{
+  "name": "protect-main-develop",
+  "target": "branch",
+  "enforcement": "active",
+  "bypass_actors": [],
+  "conditions": {
+    "ref_name": {
+      "include": [
+        "refs/heads/main",
+        "refs/heads/develop"
+      ],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "deletion"
+    },
+    {
+      "type": "non_fast_forward"
+    },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": false,
+        "required_status_checks": [
+          {
+            "context": "static",
+            "integration_id": 15368
+          },
+          {
+            "context": "unit",
+            "integration_id": 15368
+          },
+          {
+            "context": "e2e",
+            "integration_id": 15368
+          },
+          {
+            "context": "secrets",
+            "integration_id": 15368
+          }
+        ]
+      }
+    }
+  ]
+}

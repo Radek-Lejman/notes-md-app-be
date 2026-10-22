@@ -7,7 +7,7 @@ interface NoteBody {
   parentId?: string | null;
 }
 
-/** Authorization convention (KONCEPCJA §3, layer 2): user B gets 404 on user A's resources. */
+/** Authorization convention (docs/ai-dev-system/CONCEPT.md §3, layer 2): user B gets 404 on user A's resources. */
 describe('Notes authorization (e2e)', () => {
   let app: NestExpressApplication;
   let alice: TestUser;
