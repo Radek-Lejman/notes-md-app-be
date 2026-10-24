@@ -80,8 +80,8 @@ describe('Notes authorization (e2e)', () => {
     expect(await titleOfAliceNote()).toBe('Alice private note');
   });
 
-  // D5: Prisma P2025 from update({ where: { id, userId } }) is not mapped, so the API answers 500.
-  it.failing("AC-AUTHZ: B's PATCH on A's note returns 404 (see D5)", async () => {
+  // D5 (fixed): Prisma P2025 from update({ where: { id, userId } }) is mapped to 404.
+  it("AC-AUTHZ: B's PATCH on A's note returns 404 (see D5)", async () => {
     await bob.agent
       .patch(`/api/notes/${aliceNote.id}`)
       .set('X-CSRF-Token', bob.csrfToken)
@@ -89,14 +89,27 @@ describe('Notes authorization (e2e)', () => {
       .expect(404);
   });
 
-  // D14: parentId is not checked for ownership, so B can attach a note under A's note (200).
-  // Reads do not leak (children are scoped by userId), but it links data across accounts.
-  it.failing("AC-AUTHZ: B cannot create a note under A's note (parentId, see D14)", async () => {
+  // D14 (fixed): parentId is connected only among the caller's notes, so linking across accounts fails.
+  it("AC-AUTHZ: B cannot create a note under A's note (parentId, see D14)", async () => {
     const res = await bob.agent
       .post('/api/notes')
       .set('X-CSRF-Token', bob.csrfToken)
       .send({ title: 'Bob child', content: 'x', parentId: aliceNote.id });
 
     expect([400, 404]).toContain(res.status);
+  });
+
+  it("AC-AUTHZ: B cannot move his note under A's note (PATCH parentId, see D14)", async () => {
+    const own = await bob.agent
+      .post('/api/notes')
+      .set('X-CSRF-Token', bob.csrfToken)
+      .send({ title: 'Bob note', content: 'x' })
+      .expect(200);
+
+    await bob.agent
+      .patch(`/api/notes/${(own.body as NoteBody).id}`)
+      .set('X-CSRF-Token', bob.csrfToken)
+      .send({ parentId: aliceNote.id })
+      .expect(404);
   });
 });

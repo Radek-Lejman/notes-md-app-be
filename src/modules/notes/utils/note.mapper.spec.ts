@@ -49,37 +49,37 @@ describe('NoteMapper', () => {
       });
     });
 
-    it('connects the parent when given', () => {
+    it("connects the parent when given, only among the user's notes (D14)", () => {
       expect(
         NoteMapper.toPersistenceCreate({ title: 'T', content: '', parentId: 'p1' }, 'u1'),
-      ).toMatchObject({ content: '', parent: { connect: { id: 'p1' } } });
+      ).toMatchObject({ content: '', parent: { connect: { id: 'p1', userId: 'u1' } } });
     });
   });
 
   describe('toPersistenceUpdate', () => {
     it('omits content when only the title changes', () => {
-      expect(NoteMapper.toPersistenceUpdate({ title: 'Nowy' })).toEqual({ title: 'Nowy' });
+      expect(NoteMapper.toPersistenceUpdate({ title: 'Nowy' }, 'u1')).toEqual({ title: 'Nowy' });
     });
 
     it('stores markdown content as-is', () => {
-      expect(NoteMapper.toPersistenceUpdate({ content: '- a\n- b' })).toEqual({
+      expect(NoteMapper.toPersistenceUpdate({ content: '- a\n- b' }, 'u1')).toEqual({
         content: '- a\n- b',
       });
     });
 
     it('treats empty content as a value, not as "no change"', () => {
-      expect(NoteMapper.toPersistenceUpdate({ content: '' })).toEqual({ content: '' });
+      expect(NoteMapper.toPersistenceUpdate({ content: '' }, 'u1')).toEqual({ content: '' });
     });
 
     it('disconnects the parent for parentId null', () => {
-      expect(NoteMapper.toPersistenceUpdate({ parentId: null })).toEqual({
+      expect(NoteMapper.toPersistenceUpdate({ parentId: null }, 'u1')).toEqual({
         parent: { disconnect: true },
       });
     });
 
-    it('connects a new parent', () => {
-      expect(NoteMapper.toPersistenceUpdate({ parentId: 'p2' })).toEqual({
-        parent: { connect: { id: 'p2' } },
+    it("connects a new parent, only among the user's notes (D14)", () => {
+      expect(NoteMapper.toPersistenceUpdate({ parentId: 'p2' }, 'u1')).toEqual({
+        parent: { connect: { id: 'p2', userId: 'u1' } },
       });
     });
   });

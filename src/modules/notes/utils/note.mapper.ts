@@ -18,16 +18,20 @@ export class NoteMapper {
     return prismaNotes.map((note) => this.toDomain(note));
   }
 
+  /** The parent is connected only among the user's own notes (D14): a foreign one fails with P2025. */
   static toPersistenceCreate(domainNote: NoteBase, userId: string): Prisma.NoteCreateInput {
     return {
       title: domainNote.title,
       content: domainNote.content,
       user: { connect: { id: userId } },
-      ...(domainNote.parentId && { parent: { connect: { id: domainNote.parentId } } }),
+      ...(domainNote.parentId && {
+        parent: { connect: { id: domainNote.parentId, userId } },
+      }),
     };
   }
 
-  static toPersistenceUpdate(domainNote: UpdateNoteDto): Prisma.NoteUpdateInput {
+  /** The parent is connected only among the user's own notes (D14): a foreign one fails with P2025. */
+  static toPersistenceUpdate(domainNote: UpdateNoteDto, userId: string): Prisma.NoteUpdateInput {
     const updateInput: Prisma.NoteUpdateInput = {};
 
     if (domainNote.title !== undefined) {
@@ -42,7 +46,7 @@ export class NoteMapper {
       updateInput.parent =
         domainNote.parentId === null
           ? { disconnect: true }
-          : { connect: { id: domainNote.parentId } };
+          : { connect: { id: domainNote.parentId, userId } };
     }
 
     return updateInput;

@@ -1,5 +1,7 @@
 import { PrismaService } from 'src/infrastructure/database/prisma/prisma.service';
 import { NotesService } from './notes.service';
+import { NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { NotesPgRepository } from '../utils/notesPgRepository';
 
 describe('NotesService', () => {
@@ -25,6 +27,12 @@ describe('NotesService', () => {
     updatedAt: new Date('2026-01-02'),
   };
 
+  const recordNotFound = () =>
+    new Prisma.PrismaClientKnownRequestError('No record was found.', {
+      code: 'P2025',
+      clientVersion: 'test',
+    });
+
   beforeEach(() => {
     jest.resetAllMocks();
     note.findMany.mockResolvedValue([row]);
@@ -46,8 +54,21 @@ describe('NotesService', () => {
       note.create.mockResolvedValue(row);
       await service.createNote({ title: 'T', content: '', parentId: 'p1' }, 'user-1');
       expect(note.create.mock.calls[0][0]).toMatchObject({
-        data: { parent: { connect: { id: 'p1' } } },
+        data: { parent: { connect: { id: 'p1', userId: 'user-1' } } },
       });
+    });
+
+    it("answers 404 for a parent that is missing or another user's (D14)", async () => {
+      note.create.mockRejectedValue(recordNotFound());
+      await expect(
+        service.createNote({ title: 'T', content: '', parentId: 'foreign' }, 'user-2'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('rethrows other database errors unchanged', async () => {
+      const failure = new Error('connection lost');
+      note.create.mockRejectedValue(failure);
+      await expect(service.createNote({ title: 'T', content: '' }, 'user-1')).rejects.toBe(failure);
     });
   });
 
@@ -63,11 +84,12 @@ describe('NotesService', () => {
     });
   });
 
-  it('updateNote propagates "record not found" for a note of another user (see D5)', async () => {
-    const notFound = Object.assign(new Error('Record to update not found.'), { code: 'P2025' });
-    note.update.mockRejectedValue(notFound);
+  it('updateNote answers 404 for a missing note or a note of another user (D5)', async () => {
+    note.update.mockRejectedValue(recordNotFound());
 
-    await expect(service.updateNote({ title: 'x' }, 'n1', 'user-2')).rejects.toBe(notFound);
+    await expect(service.updateNote({ title: 'x' }, 'n1', 'user-2')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('getAllNotes lists the notes of the current user without their content', async () => {
