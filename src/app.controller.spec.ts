@@ -21,4 +21,9 @@ describe('AppController', () => {
     expect(appController.getHello()).toBe('hello from service');
     expect(getHello).toHaveBeenCalledTimes(1);
   });
+
+  it('health answers ok without touching the service', () => {
+    expect(appController.health()).toEqual({ status: 'ok' });
+    expect(getHello).not.toHaveBeenCalled();
+  });
 });
