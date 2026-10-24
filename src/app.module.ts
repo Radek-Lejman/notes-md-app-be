@@ -13,6 +13,8 @@ import { PrismaModule } from './infrastructure/database/prisma/prisma.module';
 import { NotesModule } from './modules/notes/notes.module';
 import { AiModule } from './modules/ai/ai.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwtAuthGuard.guard';
+import { Request } from 'express';
+import { clientKey } from './infrastructure/security/utils/clientKey';
 
 @Module({
   imports: [
@@ -24,10 +26,14 @@ import { JwtAuthGuard } from './modules/auth/guards/jwtAuthGuard.guard';
       isGlobal: true,
       envFilePath: '.env',
     }),
-    ThrottlerModule.forRoot([
-      { name: 'global', ttl: throttleGlobalConfig.ttl, limit: throttleGlobalConfig.limit },
-      { name: 'auth', ttl: throttleAuthConfig.ttl, limit: throttleAuthConfig.limit },
-    ]),
+    ThrottlerModule.forRoot({
+      throttlers: [
+        { name: 'global', ttl: throttleGlobalConfig.ttl, limit: throttleGlobalConfig.limit },
+        { name: 'auth', ttl: throttleAuthConfig.ttl, limit: throttleAuthConfig.limit },
+      ],
+      // Same client identity as brute force: an IPv6 /64 counts as one client.
+      getTracker: (req: Request) => clientKey(req.ip),
+    }),
   ],
   controllers: [AppController],
   providers: [

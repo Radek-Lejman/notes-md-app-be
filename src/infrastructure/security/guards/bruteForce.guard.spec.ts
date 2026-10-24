@@ -24,29 +24,22 @@ describe('BruteForceGuard', () => {
 
   afterEach(() => jest.restoreAllMocks());
 
-  it('lets a request through and stores the IP and account keys for the login handler', () => {
-    const req = request({ email: '  Alice@Example.COM ' });
+  it('lets a request through and stores the client key for the login handler', () => {
+    const req = request({ email: 'alice@example.com' });
 
     expect(guard.canActivate(makeHttpContext(req))).toBe(true);
-    expect(req.__bfKeys).toEqual(['ip:10.0.0.1', 'acct:alice@example.com']);
-  });
-
-  it.each([
-    ['no body', undefined],
-    ['no email', { password: 'x' }],
-    ['a blank email', { email: '   ' }],
-  ])('uses only the IP key for %s', (_case, body) => {
-    const req = request(body);
-
-    guard.canActivate(makeHttpContext(req));
     expect(req.__bfKeys).toEqual(['ip:10.0.0.1']);
   });
 
-  it.each([
-    ['the IP', 'ip:10.0.0.1'],
-    ['the account (any IP, any letter case)', 'acct:alice@example.com'],
-  ])('rejects with 429 and Retry-After when %s is locked', (_case, lockedKey) => {
-    lock(lockedKey);
+  it('counts a whole IPv6 /64 as one client', () => {
+    const req = request({}, '2001:db8:1:2::77');
+
+    guard.canActivate(makeHttpContext(req));
+    expect(req.__bfKeys).toEqual(['ip:2001:db8:1:2::/64']);
+  });
+
+  it('rejects with 429 and Retry-After when the client is locked', () => {
+    lock('ip:10.0.0.1');
     const res = makeResponse();
 
     let error: unknown;
@@ -62,10 +55,22 @@ describe('BruteForceGuard', () => {
     expect(res.setHeader).toHaveBeenCalledWith('Retry-After', '120');
   });
 
-  it('does not lock other accounts from a different IP', () => {
-    lock('acct:alice@example.com');
-    expect(
-      guard.canActivate(makeHttpContext(request({ email: 'bob@example.com' }, '10.0.0.2'))),
-    ).toBe(true);
+  it('does not lock a different client', () => {
+    lock('ip:10.0.0.1');
+    expect(guard.canActivate(makeHttpContext(request({}, '10.0.0.2')))).toBe(true);
+  });
+
+  it("S4: failures from a stranger's IP do not lock the owner out of their account", () => {
+    lock('ip:6.6.6.6');
+
+    expect(guard.canActivate(makeHttpContext(request({ email: 'alice@example.com' })))).toBe(true);
+  });
+
+  it('a locked IPv6 client cannot dodge the lock with another address of its /64', () => {
+    lock('ip:2001:db8:1:2::/64');
+
+    expect(() => guard.canActivate(makeHttpContext(request({}, '2001:db8:1:2::beef')))).toThrow(
+      TooManyRequestsException,
+    );
   });
 });

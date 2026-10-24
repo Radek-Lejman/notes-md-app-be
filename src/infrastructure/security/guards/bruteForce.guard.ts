@@ -1,7 +1,10 @@
 import { CanActivate, ExecutionContext, Injectable, HttpException, Logger } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { TooManyRequestsException } from 'src/infrastructure/security/exceptions/too-many-requests.exception';
-import { BruteForceService } from 'src/infrastructure/security/services/bruteForceService';
+import {
+  BruteForceService,
+  bruteForceKeys,
+} from 'src/infrastructure/security/services/bruteForceService';
 
 @Injectable()
 export class BruteForceGuard implements CanActivate {
@@ -13,10 +16,7 @@ export class BruteForceGuard implements CanActivate {
     const req = http.getRequest<Request>();
     const res = http.getResponse<Response>();
 
-    const ip = req.ip;
-    const email = (req.body?.email ?? '').toString().trim().toLowerCase();
-
-    const keys = [`ip:${ip}`, email ? `acct:${email}` : null].filter(Boolean) as string[];
+    const keys = bruteForceKeys(req.ip);
     req.__bfKeys = keys;
 
     const locked = this.bf.firstLocked(keys);

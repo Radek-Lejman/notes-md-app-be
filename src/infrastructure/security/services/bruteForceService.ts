@@ -1,11 +1,23 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { BruteForceEntry } from 'src/infrastructure/security/types/bruteForce.types';
 import { bruteForceConfig } from 'src/infrastructure/security/config/bruteForce.config';
+import { clientKey } from 'src/infrastructure/security/utils/clientKey';
+
+/**
+ * Keys counted for one login attempt: only the client (IPv4 address or IPv6 /64, see clientKey).
+ * There is deliberately no account key: it would let anyone lock the owner out of their account
+ * just by knowing the email (S4). Accepted residual risk: guessing one account from many
+ * networks is capped per network only — add a CAPTCHA or delay when that becomes a real threat.
+ */
+export function bruteForceKeys(ip: string | undefined): string[] {
+  return [`ip:${clientKey(ip)}`];
+}
 
 @Injectable()
 export class BruteForceService {
   private readonly logger = new Logger(BruteForceService.name);
   private readonly attemptsStore = new Map<string, BruteForceEntry>();
+  private lastSweep = Date.now();
 
   private now(): number {
     return Date.now();
@@ -51,8 +63,23 @@ export class BruteForceService {
     return msRemaining > 0 ? Math.ceil(msRemaining / 1000) : 0;
   }
 
+  /** Drops entries whose window and lock are over, at most once per window. */
+  private sweepExpired(): void {
+    const currentTime = this.now();
+    if (currentTime - this.lastSweep < bruteForceConfig.windowMs) return;
+    this.lastSweep = currentTime;
+
+    for (const [key, entry] of this.attemptsStore) {
+      const locked = entry.lockedUntil !== undefined && entry.lockedUntil > currentTime;
+      if (!locked && currentTime - entry.firstAttemptTime > bruteForceConfig.windowMs) {
+        this.attemptsStore.delete(key);
+      }
+    }
+  }
+
   /** Register a failed attempt */
   recordFailure(key: string): void {
+    this.sweepExpired();
     const entry = this.getOrCreateEntry(key);
 
     // Do nothing if the key is already locked
@@ -79,6 +106,11 @@ export class BruteForceService {
   /** Reset attempts for multiple keys */
   resetMany(keys: string[]): void {
     for (const key of keys) this.reset(key);
+  }
+
+  /** Number of keys currently tracked (for monitoring and tests). */
+  get size(): number {
+    return this.attemptsStore.size;
   }
 
   /** Find the first locked key from a list */

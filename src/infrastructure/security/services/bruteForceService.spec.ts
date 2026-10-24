@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { BruteForceService } from './bruteForceService';
+import { BruteForceService, bruteForceKeys } from './bruteForceService';
 import { bruteForceConfig } from '../config/bruteForce.config';
 
 // Literal values: the first test pins them to the config, the rest relies on them.
@@ -121,21 +121,62 @@ describe('BruteForceService', () => {
   });
 
   it('recordFailureMany / resetMany apply to every key', () => {
-    fail('acct:a@x.io', maxAttempts - 1);
-    service.recordFailureMany(['ip:1', 'acct:a@x.io']);
-    expect(service.isLocked('acct:a@x.io')).toBe(true);
+    fail('ip:2', maxAttempts - 1);
+    service.recordFailureMany(['ip:1', 'ip:2']);
+    expect(service.isLocked('ip:2')).toBe(true);
     expect(service.isLocked('ip:1')).toBe(false);
 
-    service.resetMany(['ip:1', 'acct:a@x.io']);
-    expect(service.isLocked('acct:a@x.io')).toBe(false);
+    service.resetMany(['ip:1', 'ip:2']);
+    expect(service.isLocked('ip:2')).toBe(false);
   });
 
   it('firstLocked returns the first locked key, or undefined', () => {
-    fail('acct:a@x.io', maxAttempts);
+    fail('ip:2', maxAttempts);
 
-    expect(service.firstLocked(['ip:1', 'acct:a@x.io'])).toBe('acct:a@x.io');
+    expect(service.firstLocked(['ip:1', 'ip:2'])).toBe('ip:2');
     expect(service.firstLocked(['ip:1'])).toBeUndefined();
     expect(service.firstLocked([])).toBeUndefined();
+  });
+
+  it('bruteForceKeys: one key per client, an IPv6 /64 counting as one client', () => {
+    expect(bruteForceKeys('1.2.3.4')).toEqual(['ip:1.2.3.4']);
+    expect(bruteForceKeys('2001:db8:1:2::9')).toEqual(bruteForceKeys('2001:db8:1:2::abcd'));
+  });
+
+  describe('S6: memory', () => {
+    const storeSize = () => service.size;
+
+    it('drops entries whose window has passed on a later failure', () => {
+      fail('ip:1', 1);
+      fail('ip:2', 1);
+      jest.advanceTimersByTime(windowMs + 1);
+
+      service.recordFailure('ip:3');
+      expect(storeSize()).toBe(1);
+    });
+
+    it('keeps a locked entry until its lock is over', () => {
+      fail('ip:1', maxAttempts);
+      jest.advanceTimersByTime(windowMs + 1);
+
+      service.recordFailure('ip:2');
+      expect(service.isLocked('ip:1')).toBe(true);
+
+      jest.advanceTimersByTime(lockMs);
+      service.recordFailure('ip:2');
+      expect(storeSize()).toBe(1);
+    });
+
+    it('sweeps at most once per window', () => {
+      fail('ip:1', 1);
+      jest.advanceTimersByTime(windowMs + 1);
+      service.recordFailure('ip:2'); // sweeps ip:1
+      fail('ip:3', 1);
+      jest.advanceTimersByTime(windowMs / 2);
+
+      service.recordFailure('ip:4'); // too early: ip:2 and ip:3 stay
+      expect(storeSize()).toBe(3);
+    });
   });
 
   it('an unknown key is neither locked nor waiting', () => {
