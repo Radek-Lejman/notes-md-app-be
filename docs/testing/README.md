@@ -170,8 +170,11 @@ Defects that cannot be checked with a unit test (D3, D13) are in table A.1 with 
 | Refresh with an expired/forged/malformed token → 401 (D1, fixed) | `test/auth.e2e-spec.ts` |
 | Refresh with the old token after `revokeAll` → 401 (D2 fixed, error path in a unit test) | `test/auth.e2e-spec.ts` |
 | Access token after `revokeAll` → 401 immediately (S3 fixed) | `test/auth.e2e-spec.ts` |
+| Brute force behind a proxy: the attacker's IP is locked, the owner is not (S4, S12); a spoofed X-Forwarded-For is ignored without `TRUST_PROXY` | `test/auth.sessions.e2e-spec.ts` |
+| Logout revokes the session's refresh token, also after a refresh; other sessions and other users stay signed in (S11, AC-AUTHZ) | `test/auth.sessions.e2e-spec.ts` |
+| Compressed request bodies → 415 | `test/security.body.e2e-spec.ts` |
 
-## Security backlog (found in reviews on 2026-10-15)
+## Security backlog (found in reviews on 2026-10-15 and 2026-10-24)
 
 Issues without an `it.failing` test — to decide / do later. Fixed ones stay with a note.
 
@@ -180,17 +183,20 @@ Issues without an `it.failing` test — to decide / do later. Fixed ones stay wi
 | S1 | high | **Fixed** (branch `fix/secrets-and-session-revocation`): `AI_CREDENTIALS_SECRET` had a fallback known from the repo; outside `NODE_ENV=production`, users' AI keys were encrypted with a public key. | Fallback removed; `change-me` placeholders from `.env.example` rejected in production. |
 | S2 | medium | **Fixed** (as above): the same secret for access and refresh → a refresh token (7 days) passes as an access token. | App startup refuses identical secrets. |
 | S3 | medium | **Fixed** (as above): after "log out everywhere" the access token still worked for up to 15 min. | `tokenVersion` in the access token, the guard checks it in the database (1 query per request). |
-| S4 | low | 20 bad passwords for **someone else's** account lock the owner out of login for 2 min, with no repeat limit. | E.g. account lock only combined with IP, CAPTCHA after N attempts, or increasing delay only per IP. |
-| S5 | low | A successful login also resets the IP counter (`resetMany(bfKeys)`) — an attacker with their own account can reset it between attempts. | After success, clear only the account key. |
-| S6 | low | `BruteForceService.attemptsStore` never removes expired entries; an in-memory store, separate per instance. | Periodic cleanup / Redis when scaling. |
-| S7 | info | Dockerfile: `node:20` (while `.nvmrc` = 22), `start:dev`, no `NODE_ENV` — for local work only. | A separate production image before the first deployment. |
-| S8 | info | JWT `verify()` without a pinned `algorithms` list; `JwtAuthGuard` logs the whole error object. | Hardening when convenient. |
-| S9 | high | `npm audit`: 42 existing vulnerabilities in dependencies, incl. `proxy-addr` (critical, IP spoofing), `jws` (JWT HMAC verification), `path-to-regexp`, `multer`. | Dependency updates before deployment (stage 3). |
-| S10 | low | Sorting by relevance (`rank`) has no pagination — the cursor only supports `updatedAt`. | A (rank, id) cursor or offset for ranked results. |
-| S11 | info | A plain "Log out" only clears cookies; a stolen refresh token works until "log out everywhere" or expiry (7 days). | Invalidate the current refresh token (jti) on logout. |
+| S4 | low | **Fixed** (branch `fix/security-backlog`): 20 bad passwords for **someone else's** account locked the owner out of login for 2 min, with no repeat limit. | Brute force counts per client only (IPv4, or IPv6 by /64); no account-wide key. Residual risk: guessing one account from many networks is capped per network only — CAPTCHA or a delay if that becomes a real threat. |
+| S5 | low | **Fixed** (as above): a successful login also reset the IP counter — an attacker with their own account could reset it between attempts. | A successful login no longer resets the counter; it expires with the window. |
+| S6 | low | **Fixed** (as above): `BruteForceService.attemptsStore` never removed expired entries. | Expired entries are swept at most once per window. Still in memory, per instance — Redis when scaling. |
+| S7 | info | Dockerfile: `node:20` (while `.nvmrc` = 22), `start:dev`, no `NODE_ENV` — for local work only. | A separate production image before the first deployment (stage 3). |
+| S8 | info | **Fixed** (as above): JWT `verify()` without a pinned `algorithms` list; `JwtAuthGuard` logged the whole error object. | `algorithms: ['HS256']`; the guard logs only the error name and message. |
+| S9 | high | **Fixed** (as above): `npm audit` reported vulnerabilities in dependencies (42 on 2026-10-15, 8 in production on 2026-10-24). | Audit fixes + `multer` override 2.5.0 → 2 low left: `cookie` < 0.7 inside `csurf`, unreachable (fixed cookie name and path). Body parsers also reject compressed bodies (`inflate: false`). |
+| S10 | low | **Fixed** (as above): sorting by relevance (`rank`) had no pagination — the cursor only supported `updatedAt`. | The cursor (`{ id, order }`) also works for `rank`/`-rank`: the next page starts after the given note. |
+| S11 | info | **Fixed** (as above): a plain "Log out" only cleared cookies; a stolen refresh token worked until "log out everywhere" or expiry (7 days). | The access token carries `sid` (the refresh token's jti); logout revokes that refresh token. The access token itself still lives up to 15 min. |
+| S12 | high | **Fixed** (as above): no `trust proxy` — behind a reverse proxy (Railway) every client has the proxy's IP, so one attacker locks everybody out of login and the rate limits. | `TRUST_PROXY` (proxy hops, default 0). **Set `TRUST_PROXY=1` on Railway** and check `req.ip` once after deploying. |
+| S13 | low | **Fixed** (as above): refresh rotation read and revoked the old token in two steps — two parallel refreshes with one token created two live sessions. | Atomic revoke (`updateMany` with `revoked: false`, count must be 1). |
 
 ## Known suite behaviour
 
+- **Random e2e 404/403/"socket hang up" on macOS**: `request(app.getHttpServer())` makes supertest bind a new random port per request; on macOS that port can already be taken on 127.0.0.1 by another local process (editor helpers, etc.), and the request lands there. Not a code bug (also seen on `develop`); CI on Linux is unaffected. `test/auth.sessions.e2e-spec.ts` and `test/security.body.e2e-spec.ts` listen once on 127.0.0.1 to avoid it; doing the same in `test/support/app.ts` would fix every suite.
 - **Modules reading env at import time** (`jwt.config`, `cookie.utils`, `env.ts`, `aiModule.config`) are loaded in tests via `jest.isolateModules`, with `process.env` set for each case. A plain `import` at the top of the file would read env only once.
 - **`@prisma/client` loads `.env` at import time.** That is why `test/unit-env.setup.ts` exists: without it the test results would depend on whether the developer has a local `.env`.
 - **Fake timers and `jsonwebtoken`**: in tests with `signAsync` use `jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] })`, otherwise the signature never completes (timeout).
