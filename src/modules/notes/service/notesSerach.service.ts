@@ -55,7 +55,8 @@ export class NotesSearchService {
     cursorId: string | undefined,
   ): NoteSearchOptions {
     if (order === 'rank' || order === '-rank') {
-      return { orderBy: undefined, take, rank: order === 'rank' ? 'best-first' : 'worst-first' };
+      const rank = order === 'rank' ? 'best-first' : 'worst-first';
+      return { orderBy: undefined, take, rank, cursorId };
     }
     return { orderBy: buildNoteSearchOrderBy(order), take, cursorId };
   }

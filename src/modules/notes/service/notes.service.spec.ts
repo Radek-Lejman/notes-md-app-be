@@ -209,6 +209,27 @@ describe('NotesService', () => {
         expect(found.map((n) => n.id)).toEqual(['low', 'a-mid', 'b-mid', 'top']);
       });
 
+      it('S10: continues after the cursor note in relevance order', async () => {
+        const found = await service.getNoteByText('user-1', {}, 'q', {
+          orderBy: undefined,
+          take: 2,
+          rank: 'best-first',
+          cursorId: 'a-mid',
+        });
+        expect(found.map((n) => n.id)).toEqual(['b-mid', 'low']);
+      });
+
+      it('returns an empty page for a cursor that no longer matches', async () => {
+        const found = await service.getNoteByText('user-1', {}, 'q', {
+          orderBy: undefined,
+          take: 2,
+          rank: 'best-first',
+          cursorId: 'gone',
+        });
+        expect(found).toEqual([]);
+        expect(note.findMany).not.toHaveBeenCalled();
+      });
+
       it('skips a note that disappeared between the two queries', async () => {
         note.findMany.mockResolvedValue(loaded(['top']));
         const found = await service.getNoteByText('user-1', {}, 'q', {

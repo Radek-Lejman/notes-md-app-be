@@ -64,7 +64,12 @@ describe('NotesSearchService', () => {
       'u1',
       Object.assign(new SearchNotesQueryDto(), { q: 'docker', fields: 'title', limit: 5, order }),
     );
-    expect(getNoteByText.mock.calls[0][3]).toEqual({ orderBy: undefined, take: 5, rank });
+    expect(getNoteByText.mock.calls[0][3]).toEqual({
+      orderBy: undefined,
+      take: 5,
+      rank,
+      cursorId: undefined,
+    });
   });
 
   it('continues from a valid cursor and ignores a malformed one', async () => {

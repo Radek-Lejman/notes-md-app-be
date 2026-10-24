@@ -109,10 +109,13 @@ export class NotesService {
 
     if (options.rank) {
       const direction = options.rank === 'best-first' ? -1 : 1;
-      const rankedIds = [...searchResults]
-        .sort((a, b) => direction * (a.rank - b.rank) || a.id.localeCompare(b.id))
-        .slice(0, take)
-        .map((row) => row.id);
+      const sorted = [...searchResults].sort(
+        (a, b) => direction * (a.rank - b.rank) || a.id.localeCompare(b.id),
+      );
+      const start = cursorId ? sorted.findIndex((row) => row.id === cursorId) + 1 : 0;
+      // Like Prisma's cursor: an id that no longer matches the query gives an empty page.
+      if (cursorId && start === 0) return [];
+      const rankedIds = sorted.slice(start, start + take).map((row) => row.id);
       const ranked = await this.prismaService.note.findMany({
         where: { userId, id: { in: rankedIds } },
         select: { ...selector, id: true },

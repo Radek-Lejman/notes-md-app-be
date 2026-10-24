@@ -15,6 +15,10 @@ describe('search cursor', () => {
     expect(decodeCursor(cursor)).toEqual({ id: 'n1', order: '-updatedAt' });
   });
 
+  it.each(['rank', '-rank'] as const)('accepts a %s cursor (S10)', (order) => {
+    expect(decodeCursor(encodeCursor({ id: 'n1', order }))).toEqual({ id: 'n1', order });
+  });
+
   it.each([
     ['nothing', undefined],
     ['an empty string', ''],
