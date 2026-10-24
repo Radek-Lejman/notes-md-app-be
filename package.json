@@ -126,5 +126,8 @@
       "jest --findRelatedTests --passWithNoTests"
     ],
     "prisma/schema.prisma": "prisma format"
+  },
+  "overrides": {
+    "multer": "2.5.0"
   }
 }
