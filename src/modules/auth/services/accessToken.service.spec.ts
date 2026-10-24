@@ -26,6 +26,18 @@ describe('AccessTokenService', () => {
     expect(Object.keys(payload).sort()).toEqual(['email', 'exp', 'iat', 'sub', 'tokenVersion']);
   });
 
+  it('adds the session id (the refresh token jti) when given', async () => {
+    const payload = service.verifyAccessToken(await service.createToken(user, 'jti-1'));
+    expect(payload.sid).toBe('jti-1');
+  });
+
+  it('accepts only HS256, even with the right secret', () => {
+    const payload = { sub: 'user-1', email: 'a@x.io', tokenVersion: 2 };
+    const hs512 = jwt.sign(payload, { secret: config.secret, algorithm: 'HS512' });
+
+    expect(() => service.verifyAccessToken(hs512)).toThrow('invalid algorithm');
+  });
+
   describe('authenticate', () => {
     it('accepts a token of the current token version', async () => {
       const token = await service.createToken(user);

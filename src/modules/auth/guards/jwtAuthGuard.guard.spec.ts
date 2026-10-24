@@ -29,6 +29,7 @@ describe('JwtAuthGuard', () => {
   } as unknown as UsersService);
   const alice = { id: 'user-1', email: 'alice@example.com', tokenVersion: 0 };
   const guard = new JwtAuthGuard(new Reflector(), tokens);
+  let warn: jest.SpyInstance;
 
   const context = (
     req: Partial<Request>,
@@ -40,7 +41,7 @@ describe('JwtAuthGuard', () => {
     findById.mockReset();
     findById.mockResolvedValue(alice as User);
     jest.spyOn(Logger.prototype, 'log').mockImplementation();
-    jest.spyOn(Logger.prototype, 'error').mockImplementation();
+    warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
   });
 
   afterEach(() => jest.restoreAllMocks());
@@ -96,6 +97,18 @@ describe('JwtAuthGuard', () => {
       new UnauthorizedException('Invalid token'),
     );
     expect(req.user).toBeUndefined();
+  });
+
+  it('logs only the error name and message, never the token', async () => {
+    const token = new JwtService().sign({ sub: 'x' }, { secret: 'y'.repeat(32) });
+
+    await expect(guard.canActivate(context({ cookies: { access_token: token } }))).rejects.toThrow(
+      UnauthorizedException,
+    );
+    expect(warn).toHaveBeenCalledWith(
+      'Token authentication failed: JsonWebTokenError: invalid signature',
+    );
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(token);
   });
 
   it('lets a @PublicEndpoint handler through without a token', async () => {

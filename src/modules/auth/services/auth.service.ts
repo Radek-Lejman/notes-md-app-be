@@ -9,7 +9,7 @@ import { RefreshTokenService } from './refreshToken.serivce';
 import { User } from 'src/modules/users/interfaces/user.interface';
 import { BruteForceService } from 'src/infrastructure/security/services/bruteForceService';
 import { JsonWebTokenError } from '@nestjs/jwt';
-import { RefreshTokenPayload } from '../interfaces/jwt.interface';
+import { AccessTokenPayload, RefreshTokenPayload } from '../interfaces/jwt.interface';
 
 @Injectable()
 export class AuthService {
@@ -42,9 +42,9 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token revoked');
     }
 
-    const accessToken = await this.accessTokenService.createToken(user);
-
-    const refreshToken = await this.refreshTokenService.rotate(oldRefreshToken);
+    const refresh = await this.refreshTokenService.rotate(oldRefreshToken);
+    const accessToken = await this.accessTokenService.createToken(user, refresh.jti);
+    const refreshToken = refresh.token;
 
     return { message: 'Access token refreshed successfully', accessToken, refreshToken };
   }
@@ -61,8 +61,8 @@ export class AuthService {
         throw new UnauthorizedException('Invalid email or password');
       }
 
-      this.bruteForceService.resetMany(bfKeys);
-
+      // No reset of the client's counter on success: otherwise an attacker could clear it by
+      // logging in to their own account between guesses (S5). It expires with the window.
       const { accessToken, refreshToken } = await this.createTokens(user);
 
       return { accessToken, refreshToken };
@@ -88,14 +88,19 @@ export class AuthService {
     return { message: 'User registered successfully', refreshToken, accessToken };
   }
 
+  /** Revokes the current session's refresh token, so a stolen copy stops working too. */
+  async logout(user: AccessTokenPayload) {
+    if (user.sid) await this.refreshTokenService.revoke(user.sid, user.sub);
+  }
+
   async revokeAll(userId: string) {
     await this.userService.bumpTokenVersion(userId);
   }
 
   private async createTokens(user: User) {
-    const accessToken = await this.accessTokenService.createToken(user);
-    const refreshToken = await this.refreshTokenService.createToken(user);
+    const refresh = await this.refreshTokenService.createToken(user);
+    const accessToken = await this.accessTokenService.createToken(user, refresh.jti);
 
-    return { accessToken, refreshToken };
+    return { accessToken, refreshToken: refresh.token };
   }
 }

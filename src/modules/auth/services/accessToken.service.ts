@@ -17,18 +17,21 @@ export class AccessTokenService {
 
   private readonly logger = new Logger(AccessTokenService.name);
 
-  public async createToken(user: Pick<User, 'id' | 'email' | 'tokenVersion'>) {
+  /** `sid` = the jti of the refresh token issued with this access token (see AccessTokenPayload). */
+  public async createToken(user: Pick<User, 'id' | 'email' | 'tokenVersion'>, sid?: string) {
     const accessPayload: AccessTokenPayload = {
       sub: user.id,
       email: user.email,
       tokenVersion: user.tokenVersion,
+      ...(sid && { sid }),
     };
 
     return this.jwtNestService.signAsync(accessPayload, this.accessConfig);
   }
 
   verifyAccessToken(token: string): AccessTokenPayload {
-    return this.jwtNestService.verify(token, this.accessConfig);
+    // Pin the algorithm we sign with, so a token can never choose its own (e.g. `none`).
+    return this.jwtNestService.verify(token, { ...this.accessConfig, algorithms: ['HS256'] });
   }
 
   /**

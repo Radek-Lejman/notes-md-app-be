@@ -55,7 +55,10 @@ export class AuthController {
   @Get('/me')
   me(@Req() req: Request) {
     const user = req['user'];
-    return user;
+    if (!user) return user;
+    // The same fields as before session ids: `sid` names the refresh token and stays internal.
+    const { sub, email, tokenVersion, iat, exp } = user;
+    return { sub, email, tokenVersion, iat, exp };
   }
 
   @PublicEndpoint()
@@ -69,7 +72,15 @@ export class AuthController {
   }
 
   @Post('/logout')
-  logout(@Res({ passthrough: true }) res: Response) {
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const user = req['user'];
+    if (!user) throw new UnauthorizedException('User not found in request');
+
+    // Logging out locally must work even when the database does not, so a failed revoke is
+    // logged rather than returned; the refresh token then still expires on its own.
+    await this.authService.logout(user).catch((err: unknown) => {
+      this.logger.error(`Logout could not revoke the session: ${String(err)}`);
+    });
     clearAuthCookies(res);
 
     return { message: 'Loged out' };

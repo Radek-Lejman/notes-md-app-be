@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { Logger, UnauthorizedException } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { AuthController } from './auth.controller';
 import { CsrfController } from './csrf.controller';
@@ -10,6 +10,7 @@ describe('AuthController', () => {
     login: jest.fn(),
     refresh: jest.fn(),
     revokeAll: jest.fn(),
+    logout: jest.fn(),
   };
   const controller = new AuthController(authService as unknown as AuthService);
   const tokens = { accessToken: 'access.jwt', refreshToken: 'refresh.jwt' };
@@ -26,6 +27,7 @@ describe('AuthController', () => {
     authService.login.mockResolvedValue(tokens);
     authService.refresh.mockResolvedValue({ message: 'x', ...tokens });
     authService.revokeAll.mockResolvedValue(undefined);
+    authService.logout.mockResolvedValue(undefined);
   });
 
   it('register sets both auth cookies and does not return the tokens in the body', async () => {
@@ -43,12 +45,12 @@ describe('AuthController', () => {
 
   it('login passes the brute-force keys from the guard and sets the cookies', async () => {
     const dto = { email: 'a@example.com', password: 'secret1' };
-    const req = { __bfKeys: ['ip:1', 'acct:a@example.com'] } as Request;
+    const req = { __bfKeys: ['ip:1', 'ip:1'] } as Request;
 
     await expect(controller.login(dto, req, res)).resolves.toEqual({
       message: 'Login successful',
     });
-    expect(authService.login).toHaveBeenCalledWith(dto, ['ip:1', 'acct:a@example.com']);
+    expect(authService.login).toHaveBeenCalledWith(dto, ['ip:1', 'ip:1']);
     expect(cookiesSet()).toHaveLength(2);
   });
 
@@ -66,9 +68,9 @@ describe('AuthController', () => {
     expect(setHeader).not.toHaveBeenCalled();
   });
 
-  it('me returns the JWT payload of the request', () => {
-    const user = { sub: 'user-1', email: 'a@example.com' };
-    expect(controller.me({ user } as unknown as Request)).toBe(user);
+  it('me returns the JWT payload of the request without the session id', () => {
+    const user = { sub: 'user-1', email: 'a@example.com', tokenVersion: 0, iat: 1, exp: 2 };
+    expect(controller.me({ user: { ...user, sid: 'jti-1' } } as unknown as Request)).toEqual(user);
   });
 
   it('refresh rotates tokens from the request and sets the new cookies', async () => {
@@ -79,10 +81,34 @@ describe('AuthController', () => {
     expect(cookiesSet()[1]).toMatch(/^refresh_token=refresh\.jwt;/);
   });
 
-  it('logout expires the auth cookies', () => {
-    expect(controller.logout(res)).toEqual({ message: 'Loged out' });
-    expect(cookiesSet()).toHaveLength(3);
-    cookiesSet().forEach((cookie) => expect(cookie).toContain('Max-Age=0'));
+  describe('logout', () => {
+    it("revokes the current session's refresh token and expires the auth cookies", async () => {
+      const user = { sub: 'user-1', sid: 'jti-1' };
+
+      await expect(controller.logout({ user } as unknown as Request, res)).resolves.toEqual({
+        message: 'Loged out',
+      });
+      expect(authService.logout).toHaveBeenCalledWith(user);
+      expect(cookiesSet()).toHaveLength(3);
+      cookiesSet().forEach((cookie) => expect(cookie).toContain('Max-Age=0'));
+    });
+
+    it('still logs out locally when revoking fails, and logs the failure', async () => {
+      const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+      authService.logout.mockRejectedValue(new Error('db down'));
+
+      await expect(
+        controller.logout({ user: { sub: 'user-1' } } as unknown as Request, res),
+      ).resolves.toEqual({ message: 'Loged out' });
+      cookiesSet().forEach((cookie) => expect(cookie).toContain('Max-Age=0'));
+      expect(error).toHaveBeenCalledWith(expect.stringContaining('db down'));
+      error.mockRestore();
+    });
+
+    it('rejects a request without an authenticated user', async () => {
+      await expect(controller.logout({} as Request, res)).rejects.toThrow(UnauthorizedException);
+      expect(authService.logout).not.toHaveBeenCalled();
+    });
   });
 
   describe('revokeAll', () => {

@@ -11,7 +11,6 @@ describe('RefreshTokenService', () => {
   const refreshToken = {
     create: jest.fn(),
     findUnique: jest.fn(),
-    update: jest.fn(),
     updateMany: jest.fn(),
   };
   const findById = jest.fn<Promise<User | null>, [string]>();
@@ -41,6 +40,7 @@ describe('RefreshTokenService', () => {
     jest.clearAllMocks();
     jest.spyOn(Logger.prototype, 'warn').mockImplementation();
     findById.mockResolvedValue(user);
+    refreshToken.updateMany.mockResolvedValue({ count: 1 });
     refreshToken.findUnique.mockImplementation(({ where }: { where: { jti: string } }) =>
       Promise.resolve({
         jti: where.jti,
@@ -62,9 +62,10 @@ describe('RefreshTokenService', () => {
         doNotFake: ['nextTick', 'setImmediate'],
       });
 
-      const token = await service.createToken(user);
+      const { token, jti } = await service.createToken(user);
 
       const record = lastRecord();
+      expect(jti).toBe(record.jti);
       expect(refreshToken.create).toHaveBeenCalledWith({
         data: { jti: record.jti, userId: 'user-1', expiresAt: new Date('2026-01-08T00:00:00Z') },
       });
@@ -84,55 +85,68 @@ describe('RefreshTokenService', () => {
     });
 
     it('never puts the password into the token', async () => {
-      const payload = service.verifyToken(await service.createToken(user));
+      const payload = service.verifyToken((await service.createToken(user)).token);
       expect(JSON.stringify(payload)).not.toContain('hash');
     });
   });
 
   describe('rotate', () => {
     it('revokes the old token and issues a new one', async () => {
-      const old = await service.createToken(user);
+      const { token: old } = await service.createToken(user);
       const oldJti = lastRecord().jti;
 
       const rotated = await service.rotate(old);
 
       expect(refreshToken.findUnique).toHaveBeenCalledWith({ where: { jti: oldJti } });
-      expect(refreshToken.update).toHaveBeenCalledWith({
-        where: { jti: oldJti },
+      expect(refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { jti: oldJti, revoked: false },
         data: { revoked: true },
       });
-      expect(service.verifyToken(rotated).jti).toBe(lastRecord().jti);
+      expect(rotated.jti).toBe(lastRecord().jti);
+      expect(service.verifyToken(rotated.token).jti).toBe(rotated.jti);
       expect(lastRecord().jti).not.toBe(oldJti);
     });
 
     it('picks up the current token version of the user', async () => {
-      const old = await service.createToken(user);
+      const { token: old } = await service.createToken(user);
       findById.mockResolvedValue({ ...user, tokenVersion: 4 });
 
-      expect(service.verifyToken(await service.rotate(old)).tokenVersion).toBe(4);
+      expect(service.verifyToken((await service.rotate(old)).token).tokenVersion).toBe(4);
     });
 
     it.each([
       ['an unknown', null],
       ['a revoked', { revoked: true, expiresAt: new Date(Date.now() + 1000) }],
     ])('detects reuse of %s token and issues nothing', async (_case, record) => {
-      const old = await service.createToken(user);
+      const { token: old } = await service.createToken(user);
       refreshToken.create.mockClear();
       refreshToken.findUnique.mockResolvedValue(record);
 
       await expect(service.rotate(old)).rejects.toThrow(
         new UnauthorizedException('Refresh token reuse detected'),
       );
-      expect(refreshToken.update).not.toHaveBeenCalled();
+      expect(refreshToken.updateMany).not.toHaveBeenCalled();
+      expect(refreshToken.create).not.toHaveBeenCalled();
+    });
+
+    it('lets only one of two parallel refreshes with the same token win', async () => {
+      const { token: old } = await service.createToken(user);
+      refreshToken.create.mockClear();
+      // The other request revoked the token between the read and our update.
+      refreshToken.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.rotate(old)).rejects.toThrow(
+        new UnauthorizedException('Refresh token reuse detected'),
+      );
       expect(refreshToken.create).not.toHaveBeenCalled();
     });
 
     it('rejects a token whose record has expired', async () => {
-      const old = await service.createToken(user);
+      const { token: old } = await service.createToken(user);
       refreshToken.findUnique.mockResolvedValue({ revoked: false, expiresAt: new Date(0) });
 
       await expect(service.rotate(old)).rejects.toThrow('Refresh token expired');
-      expect(refreshToken.update).not.toHaveBeenCalled();
+      expect(refreshToken.updateMany).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -146,13 +160,32 @@ describe('RefreshTokenService', () => {
     });
 
     it('rejects a token of a deleted user after revoking it', async () => {
-      const old = await service.createToken(user);
+      const { token: old } = await service.createToken(user);
       refreshToken.create.mockClear();
       findById.mockResolvedValue(null);
 
       await expect(service.rotate(old)).rejects.toThrow('User not found');
-      expect(refreshToken.update).toHaveBeenCalled();
+      expect(refreshToken.updateMany).toHaveBeenCalled();
       expect(refreshToken.create).not.toHaveBeenCalled();
+    });
+  });
+
+  it('verifyToken accepts only HS256, even with the right secret', () => {
+    const payload = { sub: 'user-1', email: 'a@x.io', jti: 'j1', tokenVersion: 3 };
+    const hs512 = jwt.sign(payload, { secret: config.secret, algorithm: 'HS512' });
+
+    expect(() => service.verifyToken(hs512)).toThrow('invalid algorithm');
+    expect(service.verifyToken(jwt.sign(payload, { secret: config.secret }))).toMatchObject(
+      payload,
+    );
+  });
+
+  it('revoke revokes one active token, scoped to its owner', async () => {
+    await service.revoke('j1', 'user-1');
+
+    expect(refreshToken.updateMany).toHaveBeenCalledWith({
+      where: { jti: 'j1', userId: 'user-1', revoked: false },
+      data: { revoked: true },
     });
   });
 

@@ -36,7 +36,8 @@ export class JwtAuthGuard implements CanActivate {
     } catch (e: unknown) {
       // A DB failure is a server fault, not a reason to log the user out.
       if (!(e instanceof JsonWebTokenError || e instanceof UnauthorizedException)) throw e;
-      this.logger.error('Token authentication failed', { e });
+      // Name and message only: the error object can carry the token or its payload.
+      this.logger.warn(`Token authentication failed: ${e.name}: ${e.message}`);
       throw new UnauthorizedException('Invalid token');
     }
     this.logger.log('Token authentication success');

@@ -8,7 +8,7 @@ import { User } from 'src/modules/users/interfaces/user.interface';
 import { AuthService } from './auth.service';
 import { AccessTokenService } from './accessToken.service';
 import { RefreshTokenService } from './refreshToken.serivce';
-import { RefreshTokenPayload } from '../interfaces/jwt.interface';
+import { IssuedRefreshToken, RefreshTokenPayload } from '../interfaces/jwt.interface';
 
 describe('AuthService', () => {
   const users = {
@@ -17,11 +17,12 @@ describe('AuthService', () => {
     createUser: jest.fn<Promise<User>, [{ email: string; password: string }]>(),
     bumpTokenVersion: jest.fn<Promise<number>, [string]>(),
   };
-  const accessTokens = { createToken: jest.fn<Promise<string>, [unknown]>() };
+  const accessTokens = { createToken: jest.fn<Promise<string>, [unknown, string?]>() };
   const refreshTokens = {
-    createToken: jest.fn<Promise<string>, [unknown]>(),
+    createToken: jest.fn<Promise<IssuedRefreshToken>, [unknown]>(),
     verifyToken: jest.fn<RefreshTokenPayload, [string]>(),
-    rotate: jest.fn<Promise<string>, [string]>(),
+    rotate: jest.fn<Promise<IssuedRefreshToken>, [string]>(),
+    revoke: jest.fn<Promise<void>, [string, string]>(),
   };
   const bruteForce = { resetMany: jest.fn(), recordFailureMany: jest.fn() };
   const service = new AuthService(
@@ -33,7 +34,7 @@ describe('AuthService', () => {
 
   const PASSWORD = 'correct horse';
   let user: User;
-  const bfKeys = ['ip:10.0.0.1', 'acct:alice@example.com'];
+  const bfKeys = ['ip:10.0.0.1'];
 
   beforeAll(async () => {
     user = {
@@ -52,8 +53,8 @@ describe('AuthService', () => {
     users.findById.mockResolvedValue(user);
     users.createUser.mockImplementation((data) => Promise.resolve({ ...user, ...data }));
     accessTokens.createToken.mockResolvedValue('access.jwt');
-    refreshTokens.createToken.mockResolvedValue('refresh.jwt');
-    refreshTokens.rotate.mockResolvedValue('rotated.jwt');
+    refreshTokens.createToken.mockResolvedValue({ token: 'refresh.jwt', jti: 'jti-new' });
+    refreshTokens.rotate.mockResolvedValue({ token: 'rotated.jwt', jti: 'jti-rotated' });
     refreshTokens.verifyToken.mockReturnValue({
       sub: 'user-1',
       email: 'alice@example.com',
@@ -63,14 +64,16 @@ describe('AuthService', () => {
   });
 
   describe('login', () => {
-    it('issues both tokens and clears brute-force counters for a correct password', async () => {
+    it('issues both tokens for a correct password, keeping the brute-force counter (S5)', async () => {
       await expect(
         service.login({ email: 'alice@example.com', password: PASSWORD }, bfKeys),
       ).resolves.toEqual({ accessToken: 'access.jwt', refreshToken: 'refresh.jwt' });
 
-      expect(accessTokens.createToken).toHaveBeenCalledWith(user);
       expect(refreshTokens.createToken).toHaveBeenCalledWith(user);
-      expect(bruteForce.resetMany).toHaveBeenCalledWith(bfKeys);
+      // The access token carries the refresh token's id, so logout can revoke this session.
+      expect(accessTokens.createToken).toHaveBeenCalledWith(user, 'jti-new');
+      // S5: success must not clear the client's counter (see AuthService.login).
+      expect(bruteForce.resetMany).not.toHaveBeenCalled();
       expect(bruteForce.recordFailureMany).not.toHaveBeenCalled();
     });
 
@@ -130,6 +133,7 @@ describe('AuthService', () => {
       expect(users.findById).toHaveBeenCalledWith('user-1');
       expect(accessTokens.createToken).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'user-1', email: 'alice@example.com', tokenVersion: 2 }),
+        'jti-rotated',
       );
       expect(refreshTokens.rotate).toHaveBeenCalledWith('old.jwt');
     });
@@ -183,6 +187,23 @@ describe('AuthService', () => {
 
       await expect(service.refresh(withCookie('old.jwt'))).rejects.toBe(failure);
       expect(accessTokens.createToken).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('logout', () => {
+    it("revokes the session's refresh token for the token's owner", async () => {
+      await service.logout({
+        sub: 'user-1',
+        email: 'alice@example.com',
+        tokenVersion: 2,
+        sid: 'j1',
+      });
+      expect(refreshTokens.revoke).toHaveBeenCalledWith('j1', 'user-1');
+    });
+
+    it('revokes nothing for an access token issued before session ids', async () => {
+      await service.logout({ sub: 'user-1', email: 'alice@example.com', tokenVersion: 2 });
+      expect(refreshTokens.revoke).not.toHaveBeenCalled();
     });
   });
 

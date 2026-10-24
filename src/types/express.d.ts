@@ -1,4 +1,5 @@
 import 'express-serve-static-core';
+import type { AccessTokenPayload } from 'src/modules/auth/interfaces/jwt.interface';
 
 declare module 'express-serve-static-core' {
   interface Request {
@@ -13,6 +14,7 @@ declare module 'express-serve-static-core' {
 
 declare module 'express-serve-static-core' {
   interface Request {
-    user?: JwtPayload;
+    /** Set by JwtAuthGuard from the verified access token. */
+    user?: AccessTokenPayload;
   }
 }

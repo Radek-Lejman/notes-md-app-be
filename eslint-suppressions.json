@@ -53,15 +53,6 @@
     }
   },
   "src/infrastructure/security/guards/bruteForce.guard.ts": {
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-call": {
-      "count": 3
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 4
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 1
     }
@@ -82,20 +73,6 @@
     },
     "@typescript-eslint/no-unsafe-call": {
       "count": 3
-    }
-  },
-  "src/modules/auth/controllers/auth.controller.ts": {
-    "@typescript-eslint/no-unsafe-argument": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
     }
   },
   "src/modules/auth/guards/jwtAuthGuard.guard.ts": {
