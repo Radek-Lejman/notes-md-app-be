@@ -7,6 +7,7 @@ import { NotesPgRepository } from '../utils/notesPgRepository';
 describe('NotesService', () => {
   const note = {
     findUnique: jest.fn<Promise<unknown>, [unknown]>(),
+    findFirst: jest.fn<Promise<unknown>, [unknown]>(),
     findMany: jest.fn<Promise<unknown>, [unknown]>(),
     create: jest.fn<Promise<unknown>, [unknown]>(),
     update: jest.fn<Promise<unknown>, [unknown]>(),
@@ -36,6 +37,25 @@ describe('NotesService', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     note.findMany.mockResolvedValue([row]);
+  });
+
+  describe('assertOwnedNote', () => {
+    it("passes for the user's own note", async () => {
+      note.findFirst.mockResolvedValue({ id: 'n1' });
+
+      await expect(service.assertOwnedNote('n1', 'user-1')).resolves.toBeUndefined();
+      expect(note.findFirst).toHaveBeenCalledWith({
+        where: { id: 'n1', userId: 'user-1' },
+        select: { id: true },
+      });
+    });
+
+    it("throws 404 for a missing or someone else's note", async () => {
+      note.findFirst.mockResolvedValue(null);
+      await expect(service.assertOwnedNote('n1', 'user-2')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
   });
 
   describe('createNote', () => {

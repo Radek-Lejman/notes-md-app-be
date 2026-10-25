@@ -45,6 +45,18 @@ export class NotesService {
     return NoteMapper.toDomain(created);
   }
 
+  /**
+   * 404 unless the note exists and belongs to the user. For writes that set a scalar `parentId`
+   * (`createMany`), which bypass the owner-scoped `connect` of `createNote` (D14).
+   */
+  public async assertOwnedNote(id: string, userId: string): Promise<void> {
+    const note = await this.prismaService.note.findFirst({
+      where: { id, userId },
+      select: { id: true },
+    });
+    if (!note) throw new NotFoundException('Note not found');
+  }
+
   public async getAllNotes(userId: string): Promise<NoteSummary[]> {
     return this.prismaService.note.findMany({
       where: {

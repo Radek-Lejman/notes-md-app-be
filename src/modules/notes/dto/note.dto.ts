@@ -1,12 +1,9 @@
 import { IsOptional, IsString, MaxLength, MinLength, ValidateIf } from 'class-validator';
-import { Transform, TransformFnParams } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import { OmitType, PartialType } from '@nestjs/mapped-types';
 import { NoteBase } from '../interfaces/notes.interface';
 import { MAX_CONTENT_LENGTH, MIN_CONTENT_LENGTH } from '../consts/validator.consts';
-
-/** Same markdown no matter where it came from: no BOM, LF line endings. */
-const normalizeMarkdown = ({ value }: TransformFnParams): unknown =>
-  typeof value === 'string' ? value.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n') : value;
+import { normalizeMarkdown } from '../utils/normalizeMarkdown';
 
 export class CreateNoteDto implements NoteBase {
   @IsString()
