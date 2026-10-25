@@ -438,6 +438,18 @@ Recommendation: `.txt` in the MVP; A for PDF/HTML/DOCX in phase 2; B as its own 
 ## 13. Status (2026-10-25)
 
 - All decisions in item 9 are made (the recommendations were accepted).
-- `.txt` in the MVP: `isMarkdownPath` becomes `isImportablePath` (`.md`, `.markdown`, `.txt`); a `.txt` file is
-  imported as markdown, its title comes from the file name without the extension.
-- In progress: unit tests and pure functions per item 11.
+- **BE implemented** (branch `Radek-Lejman/feature-import-module`): the pure functions in `src/modules/notes/import/`,
+  `NotesImportService`, `POST /api/notes/import`, the route's own parser in `configureApp`, the RAG drain mode,
+  unit tests and `test/notes.import.e2e-spec.ts`.
+- Differences from the text above, decided during the implementation:
+  - `.txt` is imported as markdown: `isImportablePath` (`.md`, `.markdown`, `.txt`) instead of `isMarkdownPath`.
+  - `markdownScan.maskCode` returns the markdown with code replaced by a private-use character (same length),
+    so the other functions search the masked text and slice the original.
+  - `split-h1` keeps the `# H1` line in the note content (lossless); the title is its plain text.
+  - Besides inline links and wiki links, reference definitions (`[id]: x.md`) and autolinks (`<javascript:…>`)
+    are rewritten or neutralized; scheme checks decode entities and drop whitespace like a browser.
+  - A note longer than `MAX_CONTENT_LENGTH` after link rewriting fails the whole import (400 with the file name)
+    instead of being skipped, which would leave links to a missing note.
+  - A real import with nothing importable is a 400; a dry run still reports it.
+  - `express` is a direct dependency (the same 5.2.1 Nest uses) for the route's JSON parser.
+- Next: the FE feature (item 7), then `DELETE /notes/:id` for undoing an import (item 10).

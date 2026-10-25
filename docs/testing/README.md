@@ -173,6 +173,7 @@ Defects that cannot be checked with a unit test (D3, D13) are in table A.1 with 
 | Brute force behind a proxy: the attacker's IP is locked, the owner is not (S4, S12); a spoofed X-Forwarded-For is ignored without `TRUST_PROXY` | `test/auth.sessions.e2e-spec.ts` |
 | Logout revokes the session's refresh token, also after a refresh; other sessions and other users stay signed in (S11, AC-AUTHZ) | `test/auth.sessions.e2e-spec.ts` |
 | Compressed request bodies → 415 | `test/security.body.e2e-spec.ts` |
+| Note import: tree, links, FTS, B→A under someone else's note (AC-AUTHZ), CSRF before the 25 MB parser, 413/400 limits, throttling | `test/notes.import.e2e-spec.ts` |
 
 ## Security backlog (found in reviews on 2026-10-15 and 2026-10-24)
 

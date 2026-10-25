@@ -84,6 +84,7 @@ All routes are prefixed `/api`. JWT is required globally — endpoints marked **
 | ------- | --------------- | ---- | --------------------------------------------- |
 | `GET`   | `/notes`        | JWT  | List all notes for current user               |
 | `POST`  | `/notes`        | JWT  | Create note (optional `parentId` for nesting) |
+| `POST`  | `/notes/import` | JWT  | Import many markdown files as a note tree     |
 | `GET`   | `/notes/search` | JWT  | Full-text search with cursor pagination       |
 | `GET`   | `/notes/:id`    | JWT  | Fetch note + children tree + optional parent  |
 | `PATCH` | `/notes/:id`    | JWT  | Update title / content                        |
@@ -91,6 +92,8 @@ All routes are prefixed `/api`. JWT is required globally — endpoints marked **
 **`GET /notes/:id` query params:** `fields`, `children.fields`, `children.sort`, `children.limit`, `depth`, `expand=parent`
 
 **`GET /notes/search` query params:** `q` (required), `fields`, `order`, `limit`, `cursor`
+
+**`POST /notes/import` body:** `files` (`{ path, content }[]`, up to 2000, 15 MB in total), `dryRun` (required: `true` only reports), `name`, `targetParentId`, `mode` (`files` | `split-h1`). Own 25 MB body limit, 5 requests a minute. Details: `docs/import/IMPORT-CONCEPT.md`.
 
 ---
 
