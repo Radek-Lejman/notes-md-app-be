@@ -27,7 +27,7 @@ and wants to pull them into the app once, so that they:
 | The editor (Tiptap, `createMarkdownExtensions`) has **no** tables or images; raw HTML passes through the schema | Tables, images and HTML from an import are invisible in the editor and **are lost on the first edit** (item 5.3). |
 | JSON body limit `2mb`, set globally by `useBodyParser` (takes no path) | A larger limit for import = a separate parser mounted on the path (item 5.1). |
 | No `DELETE /notes/:id` | "Undo import" needs separate work (item 10). |
-| D14: `parentId` without an owner check (`note.mapper.ts`) | Import **must not** repeat this bug; the owner-checking helper will also be used to fix D14. |
+| D14 (fixed in `f48577a`): `parent.connect` is narrowed to `{ id, userId }` and `P2025` maps to 404 | Import writes the scalar `parentId` through `createMany` (no `connect`), so it does **not** inherit that fix — `targetParentId` needs its own explicit owner check. |
 
 Conclusion: import is in practice **"create N notes at once, with a tree and rewritten links"**.
 FTS and RAG indexing are handled by existing mechanisms.
@@ -163,8 +163,9 @@ Pure functions (no Nest DI) in `src/modules/notes/import/`:
 Service and controller:
 - `service/notesImport.service.ts` — byte limit, `assertOwnedNote(targetParentId, userId)` (404), `planImport`,
   for `dryRun` only the report, otherwise the save (5.4).
-- `assertOwnedNote` as a shared helper in `NotesService` — the same helper fixes D14 in `createNote`/`updateNote`
-  (a separate commit: `it.failing` → `it`).
+- `assertOwnedNote` as a helper in `NotesService` (`findFirst({ where: { id, userId } })` → `NotFoundException`).
+  D14 itself is already fixed for `createNote`/`updateNote` (`f48577a`); this helper exists because `createMany`
+  takes a scalar `parentId` and bypasses that fix.
 - `NotesController`: `@Post('import')`; `userId` only from `@CurrentUser()`.
 - `normalizeMarkdown` extracted from `note.dto.ts` into a shared util.
 
@@ -311,16 +312,18 @@ or a notes → ai dependency; today it is the other way round).
   `openLink` — they are neutralized on import (`unsafe-link`) and an FE fix is reported.
 - **High-risk paths**: the `configureApp` change touches the HTTP pipeline — the diff must be read in full + `/security-review`.
 
-## 9. Decisions to make (recommendation in bold)
+## 9. Decisions (all decided 2026-10-25)
 
-1. ~~MVP input format~~ — **decided: folder + many files + `.zip` + `split-h1`**.
-2. Frontmatter: **a ```yaml block in the content** / cut / a tag list.
-3. Import root: **always** ("Import: Obsidian 2026-10-15") / top level.
-4. Canonicalizing content through Tiptap on import: **no** (lossless in the database + a `lossy-content` warning) / yes.
-5. ~~Re-import~~ — **decided: always new notes under a new root**. Updating
+1. MVP input format — **folder + many files + `.zip` + `split-h1`**.
+2. Frontmatter — **a ```yaml block in the content** (lossless; real tags/dates/aliases are phase 2).
+3. Import root — **always** ("Import: Obsidian 2026-10-15"), optionally under an owned `targetParentId`.
+4. Canonicalizing content through Tiptap on import — **no** (lossless in the database + a `lossy-content` warning).
+5. Re-import — **always new notes under a new root**. Updating
    previously imported notes is a separate problem (matching, conflicts with edits in the app) — phase 2.
-6. Empty files: **create only those some link points to; skip the rest** (`skipped: empty`) /
-   always create / always skip. Empty = whitespace only (also when nothing remains after cutting the frontmatter).
+6. Empty files — **create only those some link points to; skip the rest** (`skipped: empty`).
+   Empty = whitespace only (also when nothing remains after cutting the frontmatter).
+7. Other formats (item 12) — **`.txt` in the MVP** (imported as markdown); PDF/HTML/DOCX text extraction in phase 2;
+   storing originals (attachments) as its own concept document.
 
 ## 10. Risks and open questions
 
@@ -407,3 +410,34 @@ Pure functions first (TDD), then the service with a mocked Prisma, then the inde
 - a rewritten link points to a note of the same user
 - `AC-AUTHZ`: B under A's note → 404; B's notes invisible to A
 - without CSRF → 403; > 25mb → 413; other routes still 413 > 2mb; 2001 files → 400
+
+## 12. Other file formats (proposal, not decided)
+
+The MVP imports markdown only; every other file is skipped with `attachment-skipped`. Two separate problems:
+
+**A. Make the content of other formats searchable and visible to RAG** — extract the text in the browser
+(like the zip) and send it as a regular `{ path, content }` note, e.g. "Report 2024.pdf" with the text as markdown
+and a line "source: report.pdf (the original is not stored)". FTS and RAG then work unchanged; the server
+never parses binaries.
+
+| Format | How | Notes |
+|---|---|---|
+| `.txt` | as markdown | almost free — candidate for the MVP |
+| `.html` (Notion, Evernote) | HTML → markdown (e.g. `turndown`) | new FE dependency |
+| `.pdf` with a text layer | text extraction (e.g. `pdfjs-dist`) | new FE dependency; tables and columns come out poorly |
+| `.docx` | `mammoth` → markdown | new FE dependency |
+| scanned PDFs, images | OCR or a vision model | slow and costly; with Claude it spends the user's quota — on demand only |
+
+**B. Keep the original file in the app (preview/download)** — a separate feature: file storage (volume, MinIO/S3
+or `bytea`), an `Attachment` model + migration, upload/download endpoints scoped by `userId` (AC-AUTHZ),
+safe serving (type checks, limits, `Content-Disposition: attachment`, `nosniff`), image/file nodes in the editor,
+and rewriting `![[diagram.png]]` to `/api/attachments/<id>`.
+
+Recommendation: `.txt` in the MVP; A for PDF/HTML/DOCX in phase 2; B as its own concept document.
+
+## 13. Status (2026-10-25)
+
+- All decisions in item 9 are made (the recommendations were accepted).
+- `.txt` in the MVP: `isMarkdownPath` becomes `isImportablePath` (`.md`, `.markdown`, `.txt`); a `.txt` file is
+  imported as markdown, its title comes from the file name without the extension.
+- In progress: unit tests and pure functions per item 11.
