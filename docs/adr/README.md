@@ -7,3 +7,4 @@ Format (Nygard): Status · Context · Decision · Alternatives · Consequences. 
 | [0001](./0001-markdown-as-note-content.md) | Note content stored as markdown | accepted, partly superseded by 0003 |
 | [0002](./0002-per-user-claude-credentials.md) | AI on the user's own account, credentials encrypted with `SecretBox` | accepted |
 | [0003](./0003-markdown-serializer-fe-only.md) | The markdown serializer lives only in the FE | accepted |
+| [0004](./0004-module-boundaries.md) | Module boundaries checked by ESLint (`eslint-plugin-boundaries`) | accepted |
