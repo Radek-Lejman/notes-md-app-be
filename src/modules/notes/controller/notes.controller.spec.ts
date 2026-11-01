@@ -1,9 +1,11 @@
 import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
-import { AuthUser } from '@security';
+import { AuthUser } from '@common';
 import { NotesController } from './notes.controller';
 import { UserNotesService } from '../service/userNotes.service';
 import { GetNoteQueryDto } from '../dto/getNoteQuery.dto';
 import { SearchNotesQueryDto } from '../dto/searchNotesQueryDto';
+import { NotesImportService } from '../service/notesImport.service';
+import { ImportNotesDto } from '../dto/importNotes.dto';
 
 describe('NotesController', () => {
   const notes = {
@@ -13,7 +15,11 @@ describe('NotesController', () => {
     getNoteById: jest.fn(),
     updateNoteById: jest.fn(),
   };
-  const controller = new NotesController(notes as unknown as UserNotesService);
+  const notesImport = { importNotes: jest.fn() };
+  const controller = new NotesController(
+    notes as unknown as UserNotesService,
+    notesImport as unknown as NotesImportService,
+  );
   const user = { sub: 'user-1' } as AuthUser;
   const note = { id: 'n1', title: 'Docker' };
 
@@ -104,5 +110,14 @@ describe('NotesController', () => {
     notes.updateNoteById.mockResolvedValue(note);
     await expect(controller.updateNoteById('n1', { title: 'x' }, user)).resolves.toBe(note);
     expect(notes.updateNoteById).toHaveBeenCalledWith('n1', { title: 'x' }, 'user-1');
+  });
+
+  it('importNotes imports for the current user', async () => {
+    const result = { dryRun: true, rootNoteId: null, created: 1, skipped: [], warnings: [] };
+    notesImport.importNotes.mockResolvedValue(result);
+    const dto: ImportNotesDto = { files: [{ path: 'a.md', content: 'x' }], dryRun: true };
+
+    await expect(controller.importNotes(dto, user)).resolves.toBe(result);
+    expect(notesImport.importNotes).toHaveBeenCalledWith(dto, 'user-1');
   });
 });

@@ -8,6 +8,8 @@ import { NoteToIndex } from './rag.types';
 const EMBED_BATCH = 32;
 const RETRY_BASE_MS = 60_000;
 const RETRY_MAX_MS = 60 * 60_000;
+/** Pause between rounds while a backlog (e.g. a note import) is being drained. */
+export const DRAIN_DELAY_MS = 250;
 
 interface FailedNote {
   attempts: number;
@@ -17,7 +19,8 @@ interface FailedNote {
 /**
  * Keeps note embeddings up to date in the background: every RAG_INDEX_INTERVAL_MS it
  * (re)indexes notes changed since their last indexing. No hooks in the notes module —
- * staleness is `ragIndexedAt < updatedAt`.
+ * staleness is `ragIndexedAt < updatedAt`. After a full batch the next round starts almost
+ * at once ("drain"), so a large import is indexed in minutes, not hours.
  */
 @Injectable()
 export class RagIndexerService implements OnModuleInit, OnModuleDestroy {
@@ -26,6 +29,8 @@ export class RagIndexerService implements OnModuleInit, OnModuleDestroy {
   private running = false;
   /** Provider unreachable in the last round (log once, not every round). */
   private unavailable = false;
+  /** The last round fetched a full batch, so more notes are probably waiting. */
+  private drainNext = false;
   /** Notes whose own indexing failed: retried with exponential backoff so they don't block others. */
   private readonly failedNotes = new Map<string, FailedNote>();
 
@@ -65,6 +70,8 @@ export class RagIndexerService implements OnModuleInit, OnModuleDestroy {
         new Date(Date.now() - indexDebounceMs),
         this.notesWaitingForRetry(),
       );
+      // Counted on fetched notes, not successes: one failing note must not stop the drain.
+      this.drainNext = notes.length >= indexBatchSize;
 
       let indexed = 0;
       for (const note of notes) {
@@ -87,6 +94,7 @@ export class RagIndexerService implements OnModuleInit, OnModuleDestroy {
       // Typically Ollama not running / model not pulled: log once, retry next round.
       if (!this.unavailable) this.logger.warn(`RAG indexing paused: ${(e as Error).message}`);
       this.unavailable = true;
+      this.drainNext = false;
       return 0;
     } finally {
       this.running = false;
@@ -126,7 +134,9 @@ export class RagIndexerService implements OnModuleInit, OnModuleDestroy {
   private schedule(delayMs: number): void {
     this.timer = setTimeout(() => {
       void this.indexPending().finally(() => {
-        if (this.timer) this.schedule(this.config.rag.indexIntervalMs);
+        if (this.timer) {
+          this.schedule(this.drainNext ? DRAIN_DELAY_MS : this.config.rag.indexIntervalMs);
+        }
       });
     }, delayMs);
     this.timer.unref();

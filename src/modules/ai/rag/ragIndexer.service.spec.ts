@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { EmbeddingProvider, LlmProviderError, LlmProviderUnavailableError } from '@ai';
-import { RagIndexerService } from './ragIndexer.service';
+import { DRAIN_DELAY_MS, RagIndexerService } from './ragIndexer.service';
 import { RagRepository } from './rag.repository';
 import { AiModuleConfig } from '../config/aiModule.config';
 import { NoteToIndex } from './rag.types';
@@ -216,6 +216,60 @@ describe('RagIndexerService', () => {
       await jest.advanceTimersByTimeAsync(1_000);
 
       expect(error).toHaveBeenCalledWith('RAG init failed: relation does not exist');
+      expect(repository.findNotesToIndex).toHaveBeenCalledTimes(1);
+    });
+
+    const fullBatch = () =>
+      Array.from({ length: config.rag.indexBatchSize }, (_, i) => ({ ...note, id: `n${i}` }));
+
+    it('starts the next round right away after a full batch (drain)', async () => {
+      repository.findNotesToIndex.mockResolvedValueOnce(fullBatch());
+
+      await service.onModuleInit();
+      await jest.advanceTimersByTimeAsync(1_000);
+      expect(repository.findNotesToIndex).toHaveBeenCalledTimes(1);
+
+      await jest.advanceTimersByTimeAsync(DRAIN_DELAY_MS);
+      expect(repository.findNotesToIndex).toHaveBeenCalledTimes(2);
+
+      // The second round was partial: back to the normal interval.
+      await jest.advanceTimersByTimeAsync(DRAIN_DELAY_MS);
+      expect(repository.findNotesToIndex).toHaveBeenCalledTimes(2);
+      await jest.advanceTimersByTimeAsync(30_000);
+      expect(repository.findNotesToIndex).toHaveBeenCalledTimes(3);
+    });
+
+    it('keeps draining when a note of the full batch fails', async () => {
+      jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      repository.findNotesToIndex.mockResolvedValueOnce(fullBatch());
+      repository.replaceChunks.mockRejectedValueOnce(new Error('bad note'));
+
+      await service.onModuleInit();
+      await jest.advanceTimersByTimeAsync(1_000 + DRAIN_DELAY_MS);
+
+      expect(repository.findNotesToIndex).toHaveBeenCalledTimes(2);
+    });
+
+    it('waits the normal interval when the provider is unavailable', async () => {
+      repository.findNotesToIndex.mockResolvedValueOnce(fullBatch());
+      embed.mockRejectedValue(new LlmProviderUnavailableError('ollama', 'ECONNREFUSED'));
+
+      await service.onModuleInit();
+      await jest.advanceTimersByTimeAsync(1_000 + DRAIN_DELAY_MS);
+      expect(repository.findNotesToIndex).toHaveBeenCalledTimes(1);
+
+      await jest.advanceTimersByTimeAsync(30_000);
+      expect(repository.findNotesToIndex).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not drain after module destroy', async () => {
+      repository.findNotesToIndex.mockResolvedValue(fullBatch());
+
+      await service.onModuleInit();
+      await jest.advanceTimersByTimeAsync(1_000);
+      service.onModuleDestroy();
+
+      await jest.advanceTimersByTimeAsync(60_000);
       expect(repository.findNotesToIndex).toHaveBeenCalledTimes(1);
     });
 

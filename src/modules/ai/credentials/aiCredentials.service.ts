@@ -18,6 +18,28 @@ import {
 
 const HINT_LENGTH = 4;
 
+const WRONG_FORMAT: Record<CredentialType, string> = {
+  'claude-oauth-token':
+    'This does not look like a Claude token (sk-ant-oat…). Run `claude setup-token`.',
+  'anthropic-api-key': 'This does not look like an Anthropic API key (sk-ant-api…).',
+};
+
+const WRONG_TYPE: Record<CredentialType, string> = {
+  'claude-oauth-token': 'This is an Anthropic API key: choose that account type.',
+  'anthropic-api-key': 'This is a Claude subscription token: choose that account type.',
+};
+
+const OTHER_TYPE: Record<CredentialType, CredentialType> = {
+  'claude-oauth-token': 'anthropic-api-key',
+  'anthropic-api-key': 'claude-oauth-token',
+};
+
+/** Why `value` is not a `type` credential; says so when it is the other type's secret. */
+function formatError(type: CredentialType, value: string): string {
+  if (CREDENTIAL_FORMATS[OTHER_TYPE[type]].test(value)) return WRONG_TYPE[type];
+  return WRONG_FORMAT[type];
+}
+
 /**
  * Per-user Claude accounts: each user runs AI on their own subscription token or API key.
  * Secrets are encrypted at rest (bound to the user id) and never returned by the API.
@@ -59,13 +81,11 @@ export class AiCredentialsService {
   }
 
   async save(userId: string, type: CredentialType, secret: string): Promise<CredentialStatus> {
-    const value = secret.trim();
+    // A token copied from a wrapped terminal line or a web page can carry line breaks, spaces or
+    // invisible characters (zero-width, BOM); a real token has none of them.
+    const value = secret.replace(/[\s\p{Cf}]/gu, '');
     if (!CREDENTIAL_FORMATS[type].test(value)) {
-      throw new BadRequestException(
-        type === 'claude-oauth-token'
-          ? 'This does not look like a Claude token (sk-ant-oat…). Run `claude setup-token`.'
-          : 'This does not look like an Anthropic API key (sk-ant-api…).',
-      );
+      throw new BadRequestException(formatError(type, value));
     }
 
     const data = {

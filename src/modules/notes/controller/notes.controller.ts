@@ -12,19 +12,26 @@ import {
   Patch,
   Query,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { UserNotesService } from '../service/userNotes.service';
 import { Note, NoteSearchResult, NoteSummary, NoteWithFamily } from '../interfaces/notes.interface';
 import { CreateNoteDto, UpdateNoteDto } from '../dto/note.dto';
 import { GetNoteQueryDto } from '../dto/getNoteQuery.dto';
-import { AuthUser } from '@security';
+import { AuthUser } from '@common';
 import { validateAndNormalizeFields } from '../utils/validateNoteFields';
 import { CurrentUser } from '@common/decorators';
 import { SearchNotesQueryDto } from '../dto/searchNotesQueryDto';
+import { ImportNotesDto, ImportResult } from '../dto/importNotes.dto';
+import { NotesImportService } from '../service/notesImport.service';
+import { IMPORT_THROTTLE } from '../consts/import.consts';
 
 @Controller('/notes')
 export class NotesController {
   private readonly logger = new Logger(NotesController.name);
-  constructor(private readonly notesService: UserNotesService) {}
+  constructor(
+    private readonly notesService: UserNotesService,
+    private readonly notesImportService: NotesImportService,
+  ) {}
 
   @Get('')
   async getAll(@CurrentUser() user: AuthUser): Promise<NoteSummary[] | null> {
@@ -38,6 +45,17 @@ export class NotesController {
   @Post('')
   async createNote(@Body() noteDto: CreateNoteDto, @CurrentUser() user: AuthUser) {
     return await this.notesService.createNote(noteDto, user.sub);
+  }
+
+  /** Many markdown files as one note tree; `dryRun` only reports. Larger body limit: configureApp. */
+  @HttpCode(HttpStatus.OK)
+  @Throttle(IMPORT_THROTTLE)
+  @Post('import')
+  async importNotes(
+    @Body() importDto: ImportNotesDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<ImportResult> {
+    return await this.notesImportService.importNotes(importDto, user.sub);
   }
 
   @Get('search')

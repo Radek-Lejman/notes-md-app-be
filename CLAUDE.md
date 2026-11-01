@@ -29,6 +29,7 @@ Node from `.nvmrc` (22). A fresh checkout/worktree needs `npm ci` — without it
 - `src/infrastructure/` — adapters: `database` (Prisma, FTS, `isPrismaKnownError`), `security` (CSRF, helmet, throttling, brute force, `SecretBox`), `ai` (LLM / agent / embedding providers).
 - `src/modules/` — features: `auth`, `users`, `notes`, `ai`. Controller → service → Prisma/repository.
 - Aliases: `@core`, `@common`, `@security`, `@database`, `@ai` (tsconfig paths, mapped in jest and jest-e2e too).
+- Import boundaries are enforced by ESLint (`boundaries/dependencies`, [ADR 0004](docs/adr/0004-module-boundaries.md)): `core` ← `common` ← `infrastructure` ← `modules/*`; between modules only `users` ← `notes`, `users` ← `auth`, `notes` ← `ai` (acyclic). `src/*.ts` is the composition root. A new module or edge = the table in `eslint.config.mjs` and the ADR.
 - Global guards: `JwtAuthGuard` (every route needs a session; `@PublicEndpoint()` opts out) and `ThrottlerGuard`.
 - HTTP pipeline (prefix, cookies, CSRF, CORS, helmet, ValidationPipe) lives in `src/app.setup.ts` (`configureApp`), used by `main.ts` and e2e — change it there, not in `main.ts`.
 - Note content is markdown (single source of truth for display, FTS and RAG). The BE stores and searches it as text; the editor's markdown serializer (and its golden fixtures) lives only in the FE (`src/shared/lib/editor/markdown/`).
@@ -49,6 +50,19 @@ Node from `.nvmrc` (22). A fresh checkout/worktree needs `npm ci` — without it
 
 High: `src/infrastructure/security/**`, `src/modules/auth/**`, `src/modules/ai/credentials/**`, `prisma/**`, `docker-compose.yaml`, `Dockerfile`. When you change them, tell the user the diff must be read in full and suggest `/security-review`. A migration also needs reviewed SQL, a `pg_dump` before deploying to data that matters, and a note on reversibility.
 
+## Code quality
+
+Before writing new code:
+
+- **Reuse first (DRY).** Search for an existing function, hook, component, constant or type before adding one: `grep -rn` the name *and* the behaviour (the regex, the API path, the error message). Reuse or extend it. A second copy of the same logic needs a reason stated in your reply; deliberate copies across the two repos are marked `KEEP IN SYNC`.
+- **KISS.** The simplest code that solves today's problem: no abstractions, options or layers "for later". Early returns instead of nested ternaries (at most one `?:` per expression). Derive values instead of keeping them in extra state or fields.
+- **Single responsibility (SOLID).** One file does one thing (a controller, a service, a group of pure functions; HTTP, business logic and persistence are separate). A function does one thing at one level of abstraction. Extend by adding a new implementation or a map entry, not another `if` on a type; depend on injected providers (DI tokens) at module boundaries, not on concrete SDK clients.
+- **No catch-all files.** `*.types.ts`, `*.consts.ts`, `utils` hold one concept, not everything a module needs. Before adding to such a file, check that the new code belongs to the concept the file already describes; a second concept gets its own file named after it (`consts/import.consts.ts` next to `consts/validator.consts.ts`, `dto/importNotes.dto.ts` per endpoint). Only types and constants go to `types`/`consts` files: a class (an error) lives with the code that throws it, a function in its own helper file. The same applies to a barrel `index.ts` that starts re-exporting unrelated things.
+- **Size limits** (tests and fixtures excluded): a file over **150 lines** → consider splitting, over **250** → split it or justify it in your reply; a function over **40 lines** → extract steps; more than **3 parameters** → one options object.
+- **Named constants, no magic values.** Statuses, kinds and modes are a `const` object with the type derived from it (`as const` + `(typeof X)[keyof typeof X]`; Prisma enums for values stored in the DB); compare against `STATUS.member`, not a string literal. Limits and timeouts are named constants with a comment on why that value.
+- **Names say what, comments say why** (not what the next line does). No commented-out code, no dead exports.
+- **Tests come with the code:** new logic gets a test next to it; a bug fix gets a test that fails without the fix.
+
 ## Rules
 
 Tag: **[enforced: …]** = a tool blocks it; **[described]** = only this file.
@@ -63,6 +77,7 @@ Tag: **[enforced: …]** = a tool blocks it; **[described]** = only this file.
 - No new `any` / `as unknown as` (`no-explicit-any` is still off for legacy code). [described]
 - New dependency only with a stated reason in your reply. [described]
 - Finishing a turn with code changes runs `npm run verify` (Stop hook) — a red result sends you back; if you cannot fix it, say so plainly instead of claiming success. [enforced: Claude Stop hook]
+- Respect the module boundaries; do not silence `boundaries/*` with `eslint-disable` — move the code to the right layer or propose a new edge. [enforced: eslint]
 
 ## Git
 

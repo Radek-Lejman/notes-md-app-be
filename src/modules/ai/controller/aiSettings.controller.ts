@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AGENT_PROVIDER, AgentProvider, AI_CONFIG, AiConfig } from '@ai';
-import { AuthUser } from '@security';
+import { AuthUser } from '@common';
 import { CurrentUser } from '@common/decorators';
 import { AiCredentialsService } from '../credentials/aiCredentials.service';
 import { AiRunLimiter } from '../credentials/aiRunLimiter.service';

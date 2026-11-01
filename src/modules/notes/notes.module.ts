@@ -8,6 +8,7 @@ import { NotesService } from './service/notes.service';
 import { NotesTreeService } from './service/notesTree.service';
 import { NotesSearchService } from './service/notesSerach.service';
 import { NotesPgRepository } from './utils/notesPgRepository';
+import { NotesImportService } from './service/notesImport.service';
 
 @Module({
   controllers: [NotesController],
@@ -18,6 +19,7 @@ import { NotesPgRepository } from './utils/notesPgRepository';
     NotesTreeService,
     NotesSearchService,
     NotesPgRepository,
+    NotesImportService,
   ],
   exports: [UserNotesService],
 })
