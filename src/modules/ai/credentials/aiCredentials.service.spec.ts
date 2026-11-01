@@ -59,12 +59,37 @@ describe('AiCredentialsService', () => {
     });
 
     it.each([
-      ['claude-oauth-token', API_KEY],
-      ['anthropic-api-key', OAUTH],
-      ['claude-oauth-token', 'not-a-token-at-all-but-long-enough'],
-    ] as const)('rejects a %s with a wrong format', async (type, secret) => {
-      await expect(makeService().save('user-1', type, secret)).rejects.toBeInstanceOf(
-        BadRequestException,
+      ['a line break', `${OAUTH.slice(0, 30)}\n${OAUTH.slice(30)}`],
+      ['spaces and a tab', `${OAUTH.slice(0, 20)} \t${OAUTH.slice(20)}`],
+      ['a no-break space', `${OAUTH.slice(0, 20)}\u00a0${OAUTH.slice(20)}`],
+      ['zero-width characters', `\ufeff${OAUTH.slice(0, 20)}\u200b${OAUTH.slice(20)}\u200d`],
+    ])('accepts a pasted token with %s inside', async (_case, pasted) => {
+      await makeService().save('user-1', 'claude-oauth-token', pasted);
+
+      const [[{ create }]] = aiCredential.upsert.mock.calls as [[{ create: { secret: string } }]];
+      expect(box.decrypt(create.secret, 'user-1')).toBe(OAUTH);
+    });
+
+    it.each([
+      ['claude-oauth-token', API_KEY, 'This is an Anthropic API key: choose that account type.'],
+      [
+        'anthropic-api-key',
+        OAUTH,
+        'This is a Claude subscription token: choose that account type.',
+      ],
+      [
+        'claude-oauth-token',
+        'not-a-token-at-all-but-long-enough',
+        'This does not look like a Claude token (sk-ant-oat…). Run `claude setup-token`.',
+      ],
+      [
+        'anthropic-api-key',
+        'not-a-token-at-all-but-long-enough',
+        'This does not look like an Anthropic API key (sk-ant-api…).',
+      ],
+    ] as const)('rejects a %s with a wrong format', async (type, secret, message) => {
+      await expect(makeService().save('user-1', type, secret)).rejects.toThrow(
+        new BadRequestException(message),
       );
       expect(aiCredential.upsert).not.toHaveBeenCalled();
     });
