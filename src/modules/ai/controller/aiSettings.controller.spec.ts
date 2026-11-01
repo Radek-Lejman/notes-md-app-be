@@ -1,6 +1,6 @@
 import { AgentEvent, AgentRunRequest, AiAuth } from '@ai';
 import { makeAiConfig, streamOf } from '@ai/testing/ai-test.utils';
-import { AuthUser } from '@security';
+import { AuthUser } from '@common';
 import { AiSettingsController } from './aiSettings.controller';
 import { AiCredentialsService } from '../credentials/aiCredentials.service';
 import { AiRunLimiter } from '../credentials/aiRunLimiter.service';

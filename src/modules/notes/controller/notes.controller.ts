@@ -17,7 +17,7 @@ import { UserNotesService } from '../service/userNotes.service';
 import { Note, NoteSearchResult, NoteSummary, NoteWithFamily } from '../interfaces/notes.interface';
 import { CreateNoteDto, UpdateNoteDto } from '../dto/note.dto';
 import { GetNoteQueryDto } from '../dto/getNoteQuery.dto';
-import { AuthUser } from '@security';
+import { AuthUser } from '@common';
 import { validateAndNormalizeFields } from '../utils/validateNoteFields';
 import { CurrentUser } from '@common/decorators';
 import { SearchNotesQueryDto } from '../dto/searchNotesQueryDto';

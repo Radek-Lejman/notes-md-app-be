@@ -1,7 +1,7 @@
 import { Body, Controller, HttpCode, HttpStatus, Logger, Post, Res } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
-import { AuthUser } from '@security';
+import { AuthUser } from '@common';
 import { CurrentUser } from '@common/decorators';
 import { AiService } from '../service/ai.service';
 import { AiAgentService } from '../service/aiAgent.service';

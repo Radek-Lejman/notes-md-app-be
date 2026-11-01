@@ -1,5 +1,5 @@
 import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
-import { AuthUser } from '@security';
+import { AuthUser } from '@common';
 import { NotesController } from './notes.controller';
 import { UserNotesService } from '../service/userNotes.service';
 import { GetNoteQueryDto } from '../dto/getNoteQuery.dto';

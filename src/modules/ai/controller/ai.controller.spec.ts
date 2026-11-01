@@ -2,7 +2,7 @@ import { ForbiddenException, HttpStatus, Logger } from '@nestjs/common';
 import { Response } from 'express';
 import { AgentEvent, AiAuth } from '@ai';
 import { streamOf } from '@ai/testing/ai-test.utils';
-import { AuthUser } from '@security';
+import { AuthUser } from '@common';
 import { AiController } from './ai.controller';
 import { AiService } from '../service/ai.service';
 import { AiAgentService } from '../service/aiAgent.service';
