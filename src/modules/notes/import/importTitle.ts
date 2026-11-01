@@ -1,5 +1,6 @@
 import { MAX_IMPORT_TITLE_LENGTH } from '../consts/import.consts';
 import { MIN_CONTENT_LENGTH } from '../consts/validator.consts';
+import { IMPORTABLE_EXTENSION } from './importPath';
 
 export type TitleWarning = 'title-fallback' | 'title-truncated';
 
@@ -8,16 +9,18 @@ export interface ImportTitle {
   warning: TitleWarning | null;
 }
 
+/** The last-resort title when neither the file nor its folder gives one. */
+export const UNTITLED_NOTE_TITLE = 'Untitled';
+
 // Notion exports append the page id: "Plan 1a2b…(32 hex).md".
 const NOTION_ID = / [0-9a-f]{32}$/i;
-const EXTENSION = /\.(?:md|markdown|txt)$/i;
 
 export function folderTitle(name: string): string {
   return name.replace(NOTION_ID, '').trim();
 }
 
 export function fileTitle(name: string): string {
-  return folderTitle(name.replace(EXTENSION, ''));
+  return folderTitle(name.replace(IMPORTABLE_EXTENSION, ''));
 }
 
 /**

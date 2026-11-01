@@ -1,3 +1,5 @@
+import { IMPORTABLE_EXTENSION } from './importPath';
+
 export type TreeNodeKind = 'root' | 'folder' | 'file';
 
 export interface TreeNode {
@@ -25,9 +27,8 @@ interface Folder {
   files: number[];
 }
 
-const EXTENSION = /\.(?:md|markdown|txt)$/i;
 const keyOf = (segments: string[]) => segments.join('/').toLowerCase();
-const baseName = (name: string) => name.replace(EXTENSION, '');
+const baseName = (name: string) => name.replace(IMPORTABLE_EXTENSION, '');
 const sortKey = (name: string) => baseName(name).toLocaleLowerCase();
 
 /** Case-insensitive, numbers by value ("2" before "10"); raw order breaks ties for determinism. */

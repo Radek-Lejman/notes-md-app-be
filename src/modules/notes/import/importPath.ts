@@ -1,4 +1,8 @@
-export type PathRejection = 'invalid-path' | 'hidden';
+import { IMPORT_SKIP_REASON } from './importPlan.types';
+
+export type PathRejection =
+  | typeof IMPORT_SKIP_REASON.invalidPath
+  | typeof IMPORT_SKIP_REASON.hidden;
 
 export type NormalizedImportPath =
   | { ok: true; segments: string[] }
@@ -7,7 +11,8 @@ export type NormalizedImportPath =
 const WINDOWS_DRIVE = /^[a-z]:\//i;
 // eslint-disable-next-line no-control-regex -- control characters are exactly what is rejected
 const CONTROL_CHAR = /[\u0000-\u001f\u007f]/;
-const IMPORTABLE_EXTENSION = /\.(?:md|markdown|txt)$/i;
+/** Markdown and plain text files; `.txt` is imported as markdown. */
+export const IMPORTABLE_EXTENSION = /\.(?:md|markdown|txt)$/i;
 
 /**
  * Splits a path sent by the browser (`webkitRelativePath`, a zip entry) into segments.
@@ -23,23 +28,22 @@ export function normalizeImportPath(path: string): NormalizedImportPath {
     WINDOWS_DRIVE.test(normalized) ||
     CONTROL_CHAR.test(normalized)
   ) {
-    return { ok: false, reason: 'invalid-path' };
+    return { ok: false, reason: IMPORT_SKIP_REASON.invalidPath };
   }
 
   const segments = normalized.split('/');
   if (segments.some((segment) => segment.trim() === '' || segment === '.' || segment === '..')) {
-    return { ok: false, reason: 'invalid-path' };
+    return { ok: false, reason: IMPORT_SKIP_REASON.invalidPath };
   }
 
   // `.obsidian/`, `.trash/`, `.DS_Store` and other dot files are app state, not notes.
   if (segments.some((segment) => segment.startsWith('.'))) {
-    return { ok: false, reason: 'hidden' };
+    return { ok: false, reason: IMPORT_SKIP_REASON.hidden };
   }
 
   return { ok: true, segments };
 }
 
-/** Markdown and plain text files; `.txt` is imported as markdown. */
 export function isImportablePath(path: string): boolean {
   return IMPORTABLE_EXTENSION.test(path);
 }

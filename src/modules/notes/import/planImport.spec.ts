@@ -1,12 +1,13 @@
 import { MAX_CONTENT_LENGTH } from '../consts/validator.consts';
-import { ImportFileInput, ImportPlanError, planImport } from './planImport';
+import { ImportFileInput, ImportMode } from './importPlan.types';
+import { ImportPlanError, planImport } from './planImport';
 
 const sequentialIds = () => {
   let next = 0;
   return () => `id-${next++}`;
 };
 
-const plan = (files: ImportFileInput[], mode: 'files' | 'split-h1' = 'files') =>
+const plan = (files: ImportFileInput[], mode: ImportMode = 'files') =>
   planImport({ files, mode, rootTitle: 'Import: Obsidian 2026-10-25' }, sequentialIds());
 
 const file = (path: string, content = `text of ${path}`): ImportFileInput => ({ path, content });

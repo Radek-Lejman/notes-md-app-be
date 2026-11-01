@@ -1,4 +1,5 @@
-import { createLinkIndex, LinkTarget, resolveLinks } from './resolveLinks';
+import { createLinkIndex, LinkTarget } from './linkIndex';
+import { resolveLinks } from './resolveLinks';
 
 const target = (id: string, path: string, title: string): LinkTarget => ({
   id,

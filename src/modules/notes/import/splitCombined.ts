@@ -1,7 +1,6 @@
 import { markdownToPlainText } from '../utils/markdownText';
 import { maskCode } from './markdownScan';
-import { fileTitle } from './importTitle';
-import { UNTITLED_NOTE_TITLE } from '../consts/import.consts';
+import { fileTitle, UNTITLED_NOTE_TITLE } from './importTitle';
 
 export interface SplitSection {
   /** A flat, unique file path for link resolution: "<safe title>.md". */

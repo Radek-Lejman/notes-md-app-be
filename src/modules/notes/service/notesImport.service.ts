@@ -4,11 +4,15 @@ import { PrismaService } from 'src/infrastructure/database/prisma/prisma.service
 import { isPrismaKnownError } from '@database/prisma';
 import { MAX_IMPORT_TOTAL_BYTES } from '../consts/import.consts';
 import { ImportNotesDto, ImportResult } from '../dto/importNotes.dto';
+import { IMPORT_MODE } from '../import/importPlan.types';
 import { ImportPlanError, planImport } from '../import/planImport';
 import { NotesService } from './notes.service';
 
+// Rows per `createMany`: 7 bind parameters per row stay far below PostgreSQL's 65535 limit.
 export const IMPORT_BATCH_SIZE = 500;
-export const IMPORT_TRANSACTION_TIMEOUT_MS = 60_000;
+// Prisma's default interactive transaction timeout (5 s) is too short for MAX_IMPORT_FILES rows
+// that FTS indexes on insert.
+const IMPORT_TRANSACTION_TIMEOUT_MS = 60_000;
 
 function chunk<T>(items: T[], size: number): T[][] {
   return Array.from({ length: Math.ceil(items.length / size) }, (_, i) =>
@@ -60,7 +64,7 @@ export class NotesImportService {
       plan = planImport(
         {
           files: dto.files,
-          mode: dto.mode ?? 'files',
+          mode: dto.mode ?? IMPORT_MODE.files,
           rootTitle: dto.name?.trim() || `Import ${now.toISOString().slice(0, 10)}`,
         },
         newId,

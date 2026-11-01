@@ -11,7 +11,5 @@ export const IMPORT_BODY_LIMIT = '25mb';
 
 export const MAX_IMPORT_TITLE_LENGTH = 200;
 
-export const UNTITLED_NOTE_TITLE = 'Untitled';
-
 // dryRun -> fixes -> dryRun -> import fits in a minute; every request may parse up to 25 MB.
 export const IMPORT_THROTTLE = { global: { ttl: 60_000, limit: 5 } };

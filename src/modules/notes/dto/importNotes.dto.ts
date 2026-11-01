@@ -18,7 +18,7 @@ import {
   MAX_IMPORT_TITLE_LENGTH,
 } from '../consts/import.consts';
 import { normalizeMarkdown } from '../utils/normalizeMarkdown';
-import { ImportMode, ImportReport } from '../import/planImport';
+import { IMPORT_MODE, ImportMode, ImportReport } from '../import/importPlan.types';
 
 export class ImportFileDto {
   /** Relative path as the browser read it, e.g. "Projects/Docker.md". */
@@ -56,7 +56,7 @@ export class ImportNotesDto {
   targetParentId?: string;
 
   @IsOptional()
-  @IsIn(['files', 'split-h1'])
+  @IsIn(Object.values(IMPORT_MODE))
   mode?: ImportMode;
 }
 

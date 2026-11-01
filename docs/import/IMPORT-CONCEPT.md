@@ -150,14 +150,16 @@ Pure functions (no Nest DI) in `src/modules/notes/import/`:
 
 | File | Responsibility |
 |---|---|
-| `importPath.ts` | `normalizeImportPath(path)` → segments or a rejection reason: `normalize('NFC')`, `\` → `/`; rejects `..`, absolute paths (`/x`, `C:/x`), empty segments; hidden (`.obsidian/`, `.trash/`, `.DS_Store`) → `hidden`. `isMarkdownPath()` (`.md`, `.markdown`, case-insensitive). |
+| `importPath.ts` | `normalizeImportPath(path)` → segments or a rejection reason: `normalize('NFC')`, `\` → `/`; rejects `..`, absolute paths (`/x`, `C:/x`), empty segments; hidden (`.obsidian/`, `.trash/`, `.DS_Store`) → `hidden`. `isImportablePath()` / `IMPORTABLE_EXTENSION` (`.md`, `.markdown`, `.txt`, case-insensitive), shared by the other import files. |
 | `frontmatter.ts` | `splitFrontmatter(md)` → `{ frontmatter: string \| null, body }` (only when `---` is on the first line and closed); `readTitle(frontmatter)` — only a scalar `title:` (no YAML parser = no dependency). |
 | `importTitle.ts` | Title from frontmatter or the file name: without the extension, without the Notion suffix (` <32 hex>`), trimmed; empty → folder name/"Untitled" (`title-fallback`); shorter than `MIN_CONTENT_LENGTH` → padded (`"A"` → `"A (import)"`, `title-fallback`); longer than `MAX_IMPORT_TITLE_LENGTH` → truncated (`title-truncated`). |
 | `splitCombined.ts` | `splitByH1(md, fileName)` → virtual files; text before the first H1 → a note named after the file; `/` and `\` in an H1 replaced (so `CI/CD` does not create folders); duplicate titles → unique paths. |
 | `buildImportTree.ts` | Paths → tree: folder = note. Folder note: `Folder/index.md` and `Folder.md` next to `Folder/` — merged into the folder's note. UUIDs assigned up front (injected `newId`). Sibling order: folders and files together, case-insensitive `localeCompare`. Output: a "parents before children" list. |
 | `markdownScan.ts` | Iterates over the content skipping code blocks (``` and ~~~ matched by fence type and length, indented code blocks) and `` `code` `` spans. Shared by `resolveLinks`, `detectLossy`, `splitByH1`. |
-| `resolveLinks.ts` | Target index (NFC-normalized path, basename) → id; rewrites links (item 5.3); neutralizes unsafe schemes. |
+| `linkIndex.ts` | Target index (NFC-normalized path, basename) → id; `resolveTarget` (relative, from the root, path suffix, base name). |
+| `resolveLinks.ts` | Rewrites links (item 5.3) using the link index; neutralizes unsafe schemes. |
 | `detectLossy.ts` | Detects GFM tables, images, raw HTML, footnotes → `lossy-content` warnings. |
+| `importPlan.types.ts` | The plan contract shared with the DTO and service: `IMPORT_MODE`, `IMPORT_SKIP_REASON`, `ImportReport`, `PlannedNote`, `ImportPlan`. |
 | `planImport.ts` | Orchestration: **sorts the input by normalized path** (the browser's file order is not stable), filters, builds the tree, rewrites links → `ImportPlan { notes: PlannedNote[], report }`. Deterministic for a given `newId`. |
 
 Service and controller:

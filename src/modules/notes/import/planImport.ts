@@ -1,50 +1,20 @@
 import { MAX_CONTENT_LENGTH } from '../consts/validator.consts';
-import { UNTITLED_NOTE_TITLE } from '../consts/import.consts';
 import { buildImportTree } from './buildImportTree';
 import { detectLossy } from './detectLossy';
 import { frontmatterToContent, readTitle, splitFrontmatter } from './frontmatter';
 import { isImportablePath, normalizeImportPath } from './importPath';
-import { fileTitle, folderTitle, importTitle, TitleWarning } from './importTitle';
-import { createLinkIndex, LinkTarget, LinkWarningKind, resolveLinks } from './resolveLinks';
+import {
+  IMPORT_MODE,
+  IMPORT_SKIP_REASON,
+  ImportFileInput,
+  ImportMode,
+  ImportPlan,
+  ImportReport,
+} from './importPlan.types';
+import { fileTitle, folderTitle, importTitle, UNTITLED_NOTE_TITLE } from './importTitle';
+import { createLinkIndex, LinkTarget } from './linkIndex';
+import { resolveLinks } from './resolveLinks';
 import { splitByH1 } from './splitCombined';
-
-export type ImportMode = 'files' | 'split-h1';
-
-export interface ImportFileInput {
-  path: string;
-  content: string;
-}
-
-export type ImportSkipReason =
-  | 'not-markdown'
-  | 'binary'
-  | 'empty'
-  | 'duplicate-path'
-  | 'invalid-path'
-  | 'hidden';
-
-export type ImportWarningKind = LinkWarningKind | 'lossy-content' | TitleWarning;
-
-export interface ImportReport {
-  created: number;
-  skipped: { path: string; reason: ImportSkipReason }[];
-  warnings: { path: string; kind: ImportWarningKind; detail: string }[];
-}
-
-export interface PlannedNote {
-  id: string;
-  /** null for the import root; every other parent is a note from the plan. */
-  parentId: string | null;
-  title: string;
-  content: string;
-  /** Position among all planned notes, parents first; encodes the sibling order. */
-  order: number;
-}
-
-export interface ImportPlan {
-  notes: PlannedNote[];
-  report: ImportReport;
-}
 
 /** The input cannot be imported as a whole; the message names the file. */
 export class ImportPlanError extends Error {}
@@ -81,7 +51,7 @@ export function planImport(
   );
   let sectionTitles: string[] | null = null;
 
-  if (input.mode === 'split-h1') {
+  if (input.mode === IMPORT_MODE.splitH1) {
     if (files.length !== 1) {
       throw new ImportPlanError('Splitting by H1 needs exactly one file');
     }
@@ -100,10 +70,10 @@ export function planImport(
     if (!path.ok) {
       skipped.push({ path: reportedPath(file.path), reason: path.reason });
     } else if (!isImportablePath(file.path)) {
-      skipped.push({ path: reportedPath(file.path), reason: 'not-markdown' });
+      skipped.push({ path: reportedPath(file.path), reason: IMPORT_SKIP_REASON.notMarkdown });
     } else if (file.content.includes('\u0000')) {
       // A binary file named `.md`; Postgres `text` does not accept NUL either.
-      skipped.push({ path: reportedPath(file.path), reason: 'binary' });
+      skipped.push({ path: reportedPath(file.path), reason: IMPORT_SKIP_REASON.binary });
     } else {
       const { frontmatter, body } = splitFrontmatter(file.content);
       accepted.push({
@@ -118,7 +88,10 @@ export function planImport(
 
   const tree = buildImportTree(accepted, newId);
   for (const index of tree.duplicates) {
-    skipped.push({ path: reportedPath(accepted[index].path), reason: 'duplicate-path' });
+    skipped.push({
+      path: reportedPath(accepted[index].path),
+      reason: IMPORT_SKIP_REASON.duplicatePath,
+    });
   }
 
   // Titles first: links written by the import show the title of the note they point to.
@@ -189,7 +162,10 @@ export function planImport(
     } else {
       removed.add(node.id);
       if (node.fileIndex !== null) {
-        skipped.push({ path: reportedPath(accepted[node.fileIndex].path), reason: 'empty' });
+        skipped.push({
+          path: reportedPath(accepted[node.fileIndex].path),
+          reason: IMPORT_SKIP_REASON.empty,
+        });
       }
     }
   }
