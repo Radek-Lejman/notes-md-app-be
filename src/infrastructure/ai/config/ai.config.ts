@@ -86,8 +86,10 @@ export function loadAiConfig(): AiConfig {
     embeddingProvider: envString('RAG_EMBEDDING_PROVIDER', {
       default: 'ollama',
     }) as EmbeddingProviderName,
+    // On: in the retrieval eval it raised the right section in the top 5 from 0.65 to 0.73
+    // (hit@1 0.64 -> 0.69) for ~4.5 s of CPU per search. none = off.
     rerankProvider: envString('RAG_RERANK_PROVIDER', {
-      default: RERANK_OFF,
+      default: 'local',
     }) as AiConfig['rerankProvider'],
     providers: {
       'claude-cli': {

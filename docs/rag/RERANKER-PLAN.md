@@ -1,6 +1,6 @@
 # RAG reranker: plan
 
-Status: implemented behind `RAG_RERANK_PROVIDER` (default `none`), 2026-11-14; experiments pending.
+Status: implemented behind `RAG_RERANK_PROVIDER`, 2026-11-14; on by default (`local`, 20 candidates) since 2026-11-22, after the full-label eval.
 
 ## Why
 
@@ -56,7 +56,7 @@ Accept if: hit@1 about 0.70 and recall@10 above 0.85, no `regression` in any que
 
 - Memory: about 1 GB more for the reranker worker.
 - CPU latency: estimated 1–3 s per question at 40 candidates (measure, do not assume).
-- Production (Railway): the same cost, hence off by default; enabling it is a product decision.
+- Production (Railway): the same cost. Enabled by default on 2026-11-22 (product decision); `RAG_RERANK_PROVIDER=none` turns it off.
 
 ## Steps
 

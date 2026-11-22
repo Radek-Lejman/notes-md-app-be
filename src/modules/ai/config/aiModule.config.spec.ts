@@ -34,7 +34,7 @@ describe('loadAiModuleConfig', () => {
         minScore: 0.3,
         autoContextK: 4,
         hybrid: false,
-        rerankCandidates: 40,
+        rerankCandidates: 20,
         indexIntervalMs: 30_000,
         indexDebounceMs: 10_000,
         indexBatchSize: 20,

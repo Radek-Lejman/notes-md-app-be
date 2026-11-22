@@ -41,7 +41,7 @@ describe('loadAiConfig', () => {
       llmProvider: 'claude-cli',
       agentProvider: 'claude-agent-sdk',
       embeddingProvider: 'ollama',
-      rerankProvider: 'none',
+      rerankProvider: 'local',
       providers: {
         'claude-cli': { bin: 'claude', model: 'sonnet', timeoutMs: 90_000 },
         'claude-agent-sdk': { model: 'sonnet', maxTurns: 8, timeoutMs: 180_000 },

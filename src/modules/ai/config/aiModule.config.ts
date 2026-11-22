@@ -79,9 +79,9 @@ export function loadAiModuleConfig(): AiModuleConfig {
       // Off: in the retrieval eval (src/modules/ai/rag/eval) fusing in the OR keyword search
       // lowered hit@1 from 0.58 to 0.42, in every question type.
       hybrid: envBoolean('RAG_HYBRID', { default: false }),
-      // 40: in the retrieval eval most gold notes missing from the top 10 sat within the top
-      // 40; every candidate costs reranker time, so not more.
-      rerankCandidates: envNumber('RAG_RERANK_CANDIDATES', { default: 40, min: 1, max: 100 }),
+      // 20: reranker time grows with every candidate (40 took ~9.6 s per search on CPU), and
+      // 20 kept most of the eval gain at ~4.5 s.
+      rerankCandidates: envNumber('RAG_RERANK_CANDIDATES', { default: 20, min: 1, max: 100 }),
       indexIntervalMs: envNumber('RAG_INDEX_INTERVAL_MS', { default: 30_000, min: 1_000 }),
       indexDebounceMs: envNumber('RAG_INDEX_DEBOUNCE_MS', { default: 10_000, min: 0 }),
       indexBatchSize: envNumber('RAG_INDEX_BATCH_SIZE', { default: 20, min: 1, max: 500 }),

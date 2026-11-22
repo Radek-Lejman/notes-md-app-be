@@ -30,14 +30,14 @@ describe('AiInfrastructureModule', () => {
     expect(moduleRef.get(AGENT_PROVIDER)).toBeInstanceOf(OllamaAgentProvider);
   });
 
-  it('provides no reranker by default and the local one when selected', async () => {
+  it('provides the local reranker by default and none when switched off', async () => {
     delete process.env.RAG_RERANK_PROVIDER;
-    const off = await Test.createTestingModule({ imports: [AiInfrastructureModule] }).compile();
-    expect(off.get(RERANK_PROVIDER)).toBeNull();
-
-    process.env.RAG_RERANK_PROVIDER = 'local';
     const on = await Test.createTestingModule({ imports: [AiInfrastructureModule] }).compile();
     expect(on.get(RERANK_PROVIDER)).toBeInstanceOf(LocalRerankProvider);
+
+    process.env.RAG_RERANK_PROVIDER = 'none';
+    const off = await Test.createTestingModule({ imports: [AiInfrastructureModule] }).compile();
+    expect(off.get(RERANK_PROVIDER)).toBeNull();
   });
 
   it('fails to compile with an unsupported provider', async () => {
