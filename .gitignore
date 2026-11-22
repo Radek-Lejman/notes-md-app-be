@@ -71,3 +71,6 @@ cookies.txt
 # Claude Code: personal settings stay local
 .claude/settings.local.json
 CLAUDE.local.md
+
+# RAG eval runs and index cache (npm run rag:eval); they contain private vault questions
+/eval-runs
