@@ -6,7 +6,7 @@ import { RagHit } from './rag.types';
  * chunk ranked high in both lists wins; only ranks matter, not the incomparable raw scores
  * (cosine similarity vs ts_rank).
  *
- * Switch: RAG_HYBRID (default true). Off = semantic results only.
+ * Switch: RAG_HYBRID (default false: it scored worse than semantic only in the retrieval eval).
  * To remove: delete this file and its spec, the `hybrid` branch in RagSearchService.search,
  * RagRepository.keywordSearch, `rag.hybrid` in aiModule.config.ts, RAG_HYBRID in .env.example,
  * and the NoteChunk_content_fts_idx index (new migration: DROP INDEX).

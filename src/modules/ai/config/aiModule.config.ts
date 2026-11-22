@@ -72,9 +72,13 @@ export function loadAiModuleConfig(): AiModuleConfig {
       chunkSize,
       chunkOverlap: envNumber('RAG_CHUNK_OVERLAP', { default: 200, min: 0, max: chunkSize / 2 }),
       topK: envNumber('RAG_TOP_K', { default: 6, min: 1, max: 30 }),
-      minScore: envNumber('RAG_MIN_SCORE', { default: 0.45, min: 0, max: 1 }),
+      // 0.3, not 0.45: in the retrieval eval 0.45 cut relevant bge-m3 hits (recall@10 -2.6 pt);
+      // 0.2 found nothing more than 0.3.
+      minScore: envNumber('RAG_MIN_SCORE', { default: 0.3, min: 0, max: 1 }),
       autoContextK: envNumber('RAG_AUTO_CONTEXT_K', { default: 4, min: 0, max: 20 }),
-      hybrid: envBoolean('RAG_HYBRID', { default: true }),
+      // Off: in the retrieval eval (src/modules/ai/rag/eval) fusing in the OR keyword search
+      // lowered hit@1 from 0.58 to 0.42, in every question type.
+      hybrid: envBoolean('RAG_HYBRID', { default: false }),
       // 40: in the retrieval eval most gold notes missing from the top 10 sat within the top
       // 40; every candidate costs reranker time, so not more.
       rerankCandidates: envNumber('RAG_RERANK_CANDIDATES', { default: 40, min: 1, max: 100 }),
