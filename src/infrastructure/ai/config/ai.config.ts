@@ -2,6 +2,7 @@ import { envBoolean, envNumber, envString } from '@core/config';
 import { LlmProviderName } from '../types/llm.types';
 import { AgentProviderName } from '../types/agent.types';
 import { EmbeddingProviderName } from '../types/embedding.types';
+import { RERANK_OFF, RerankProviderName } from '../types/rerank.types';
 
 export const AI_CONFIG = Symbol('AI_CONFIG');
 
@@ -37,8 +38,9 @@ export interface OllamaEmbeddingConfig {
   timeoutMs: number;
 }
 
-export interface LocalEmbeddingConfig {
-  /** Hugging Face model id (ONNX), run in-process by @huggingface/transformers. */
+/** A model run on this server by @huggingface/transformers (providers/local). */
+export interface LocalModelConfig {
+  /** Hugging Face model id (ONNX). */
   model: string;
   /** Where downloaded models are kept; unset = the library default (node_modules cache). */
   cacheDir?: string;
@@ -48,6 +50,8 @@ export interface LocalEmbeddingConfig {
   idleMs: number;
 }
 
+export type LocalEmbeddingConfig = LocalModelConfig;
+
 export interface AiConfig {
   /** Active provider for simple completions. */
   llmProvider: LlmProviderName;
@@ -55,6 +59,8 @@ export interface AiConfig {
   agentProvider: AgentProviderName;
   /** Provider for RAG embeddings. */
   embeddingProvider: EmbeddingProviderName;
+  /** Provider that reorders RAG search results; 'none' = no reranking. */
+  rerankProvider: RerankProviderName | typeof RERANK_OFF;
   /** Per-provider settings, keyed by provider name. */
   providers: {
     'claude-cli': ClaudeCliConfig;
@@ -62,6 +68,7 @@ export interface AiConfig {
     ollama: OllamaConfig;
     'ollama-embedding': OllamaEmbeddingConfig;
     'local-embedding': LocalEmbeddingConfig;
+    'local-rerank': LocalModelConfig;
   };
 }
 
@@ -79,6 +86,9 @@ export function loadAiConfig(): AiConfig {
     embeddingProvider: envString('RAG_EMBEDDING_PROVIDER', {
       default: 'ollama',
     }) as EmbeddingProviderName,
+    rerankProvider: envString('RAG_RERANK_PROVIDER', {
+      default: RERANK_OFF,
+    }) as AiConfig['rerankProvider'],
     providers: {
       'claude-cli': {
         bin: envString('AI_CLAUDE_CLI_BIN', { default: 'claude' }),
@@ -108,6 +118,15 @@ export function loadAiConfig(): AiConfig {
         }),
         cacheDir: process.env.RAG_LOCAL_MODEL_DIR ? envString('RAG_LOCAL_MODEL_DIR') : undefined,
         timeoutMs: envNumber('RAG_EMBEDDING_TIMEOUT_MS', { default: 60_000, min: 1_000 }),
+        idleMs: envNumber('RAG_LOCAL_IDLE_MS', { default: 600_000, min: 1_000 }),
+      },
+      'local-rerank': {
+        model: envString('RAG_LOCAL_RERANK_MODEL', {
+          default: 'onnx-community/bge-reranker-v2-m3-ONNX',
+        }),
+        cacheDir: process.env.RAG_LOCAL_MODEL_DIR ? envString('RAG_LOCAL_MODEL_DIR') : undefined,
+        // The first request downloads ~600 MB and loads it (~100 s on a home connection).
+        timeoutMs: envNumber('RAG_RERANK_TIMEOUT_MS', { default: 300_000, min: 1_000 }),
         idleMs: envNumber('RAG_LOCAL_IDLE_MS', { default: 600_000, min: 1_000 }),
       },
     },

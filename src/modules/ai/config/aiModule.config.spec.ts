@@ -34,6 +34,7 @@ describe('loadAiModuleConfig', () => {
         minScore: 0.45,
         autoContextK: 4,
         hybrid: true,
+        rerankCandidates: 40,
         indexIntervalMs: 30_000,
         indexDebounceMs: 10_000,
         indexBatchSize: 20,
@@ -58,6 +59,7 @@ describe('loadAiModuleConfig', () => {
       RAG_CHUNK_SIZE: '1000',
       RAG_CHUNK_OVERLAP: '500',
       RAG_MIN_SCORE: '0.6',
+      RAG_RERANK_CANDIDATES: '20',
     });
 
     const config = loadAiModuleConfig();
@@ -74,6 +76,7 @@ describe('loadAiModuleConfig', () => {
       chunkSize: 1000,
       chunkOverlap: 500,
       minScore: 0.6,
+      rerankCandidates: 20,
     });
   });
 

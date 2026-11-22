@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { EmbeddingProvider } from '@ai';
+import { EmbeddingProvider, RerankProvider } from '@ai';
 import { RagSearchService } from './ragSearch.service';
 import { RagRepository } from './rag.repository';
 import { RagHit } from './rag.types';
@@ -10,11 +10,18 @@ describe('RagSearchService', () => {
   const search = jest.fn<Promise<RagHit[]>, [string, string, number[], number]>();
   const keywordSearch = jest.fn<Promise<RagHit[]>, [string, string, string, number]>();
   const stats = jest.fn();
-  const makeService = (enabled = true, hybrid = false) =>
+  const rerank = jest.fn<Promise<number[]>, [string, string[]]>();
+  const reranker = { name: 'local', model: 'bge-reranker', rerank } as RerankProvider;
+  const makeService = (
+    enabled = true,
+    hybrid = false,
+    withReranker: RerankProvider | null = null,
+  ) =>
     new RagSearchService(
-      { rag: { enabled, topK: 5, minScore: 0.5, hybrid } } as AiModuleConfig,
+      { rag: { enabled, topK: 5, minScore: 0.5, hybrid, rerankCandidates: 40 } } as AiModuleConfig,
       { model: 'bge-m3', embed } as unknown as EmbeddingProvider,
       { search, keywordSearch, stats } as unknown as RagRepository,
+      withReranker,
     );
   const hit = (score: number) => ({
     noteId: 'n',
@@ -100,6 +107,59 @@ describe('RagSearchService', () => {
     it('does not run the keyword search when RAG_HYBRID is off', async () => {
       await makeService(true, false).search('user-1', 'wakacje nad morzem');
       expect(keywordSearch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('rerank (RAG_RERANK_PROVIDER)', () => {
+    const chunk = (noteId: string) => ({
+      noteId,
+      title: noteId,
+      headingPath: `${noteId} > Section`,
+      content: `text of ${noteId}`,
+      score: 0.9,
+    });
+
+    beforeEach(() => {
+      search.mockResolvedValue([chunk('a'), chunk('b'), chunk('c')]);
+      rerank.mockReset().mockResolvedValue([0.1, 0.9, 0.5]);
+    });
+
+    it('scores RAG_RERANK_CANDIDATES chunks with their heading path and keeps the best', async () => {
+      const hits = await makeService(true, false, reranker).search('user-1', 'deploy', 2);
+
+      expect(search).toHaveBeenCalledWith('user-1', 'bge-m3', [0.1, 0.2], 40);
+      expect(rerank).toHaveBeenCalledWith('deploy', [
+        'a > Section\n\ntext of a',
+        'b > Section\n\ntext of b',
+        'c > Section\n\ntext of c',
+      ]);
+      expect(hits.map((hit) => hit.noteId)).toEqual(['b', 'c']);
+    });
+
+    it('asks for more candidates when the limit is larger than RAG_RERANK_CANDIDATES', async () => {
+      await makeService(true, false, reranker).search('user-1', 'deploy', 50);
+      expect(search).toHaveBeenCalledWith('user-1', 'bge-m3', [0.1, 0.2], 50);
+    });
+
+    it('keeps the retrieval order when the reranker fails', async () => {
+      const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      rerank.mockRejectedValue(new Error('model load failed'));
+
+      const hits = await makeService(true, false, reranker).search('user-1', 'deploy', 2);
+
+      expect(hits.map((hit) => hit.noteId)).toEqual(['a', 'b']);
+      expect(warn).toHaveBeenCalledWith('RAG rerank skipped: model load failed');
+    });
+
+    it('does not call the reranker for a single hit', async () => {
+      search.mockResolvedValue([chunk('a')]);
+      await makeService(true, false, reranker).search('user-1', 'deploy');
+      expect(rerank).not.toHaveBeenCalled();
+    });
+
+    it('exposes the reranker model, or null without one', () => {
+      expect(makeService(true, false, reranker).rerankModel).toBe('bge-reranker');
+      expect(makeService().rerankModel).toBeNull();
     });
   });
 });

@@ -21,6 +21,8 @@ export interface RagConfig {
   autoContextK: number;
   /** Fuse semantic and keyword results (rag/hybridSearch.ts); false = semantic only. */
   hybrid: boolean;
+  /** Chunks a reranker (RAG_RERANK_PROVIDER) scores before the best `limit` are kept. */
+  rerankCandidates: number;
   indexIntervalMs: number;
   /** A note is indexed only after it was not edited for this long (autosave bursts). */
   indexDebounceMs: number;
@@ -73,6 +75,9 @@ export function loadAiModuleConfig(): AiModuleConfig {
       minScore: envNumber('RAG_MIN_SCORE', { default: 0.45, min: 0, max: 1 }),
       autoContextK: envNumber('RAG_AUTO_CONTEXT_K', { default: 4, min: 0, max: 20 }),
       hybrid: envBoolean('RAG_HYBRID', { default: true }),
+      // 40: in the retrieval eval most gold notes missing from the top 10 sat within the top
+      // 40; every candidate costs reranker time, so not more.
+      rerankCandidates: envNumber('RAG_RERANK_CANDIDATES', { default: 40, min: 1, max: 100 }),
       indexIntervalMs: envNumber('RAG_INDEX_INTERVAL_MS', { default: 30_000, min: 1_000 }),
       indexDebounceMs: envNumber('RAG_INDEX_DEBOUNCE_MS', { default: 10_000, min: 0 }),
       indexBatchSize: envNumber('RAG_INDEX_BATCH_SIZE', { default: 20, min: 1, max: 500 }),

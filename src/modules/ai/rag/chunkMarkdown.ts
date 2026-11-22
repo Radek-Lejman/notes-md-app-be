@@ -1,3 +1,6 @@
+/** Joins the note title and its heading chain into `headingPath`. */
+export const HEADING_PATH_SEPARATOR = ' > ';
+
 export interface NoteChunkDraft {
   /** "Title > Heading > Subheading" */
   headingPath: string;
@@ -51,7 +54,7 @@ function splitSections(title: string, markdown: string): Section[] {
   const flush = () => {
     const text = lines.join('\n').trim();
     if (text) {
-      const headingPath = [rootTitle, ...headings.map((h) => h.text)].join(' > ');
+      const headingPath = [rootTitle, ...headings.map((h) => h.text)].join(HEADING_PATH_SEPARATOR);
       sections.push({ headingPath, text });
     }
     lines = [];

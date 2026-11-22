@@ -19,6 +19,9 @@ const AI_ENV_KEYS = [
   'RAG_LOCAL_EMBEDDING_MODEL',
   'RAG_LOCAL_MODEL_DIR',
   'RAG_LOCAL_IDLE_MS',
+  'RAG_RERANK_PROVIDER',
+  'RAG_LOCAL_RERANK_MODEL',
+  'RAG_RERANK_TIMEOUT_MS',
 ];
 
 describe('loadAiConfig', () => {
@@ -38,6 +41,7 @@ describe('loadAiConfig', () => {
       llmProvider: 'claude-cli',
       agentProvider: 'claude-agent-sdk',
       embeddingProvider: 'ollama',
+      rerankProvider: 'none',
       providers: {
         'claude-cli': { bin: 'claude', model: 'sonnet', timeoutMs: 90_000 },
         'claude-agent-sdk': { model: 'sonnet', maxTurns: 8, timeoutMs: 180_000 },
@@ -57,6 +61,12 @@ describe('loadAiConfig', () => {
           model: 'Xenova/multilingual-e5-small',
           cacheDir: undefined,
           timeoutMs: 60_000,
+          idleMs: 600_000,
+        },
+        'local-rerank': {
+          model: 'onnx-community/bge-reranker-v2-m3-ONNX',
+          cacheDir: undefined,
+          timeoutMs: 300_000,
           idleMs: 600_000,
         },
       },
@@ -83,12 +93,16 @@ describe('loadAiConfig', () => {
       RAG_LOCAL_EMBEDDING_MODEL: 'Xenova/paraphrase-multilingual-MiniLM-L12-v2',
       RAG_LOCAL_MODEL_DIR: '/models',
       RAG_LOCAL_IDLE_MS: '5000',
+      RAG_RERANK_PROVIDER: 'local',
+      RAG_LOCAL_RERANK_MODEL: 'Xenova/bge-reranker-base',
+      RAG_RERANK_TIMEOUT_MS: '9000',
     });
 
     expect(loadAiConfig()).toEqual({
       llmProvider: 'ollama',
       agentProvider: 'ollama',
       embeddingProvider: 'local',
+      rerankProvider: 'local',
       providers: {
         'claude-cli': { bin: '/bin/claude', model: 'opus', timeoutMs: 5000 },
         'claude-agent-sdk': { model: 'opus', maxTurns: 3, timeoutMs: 6000 },
@@ -108,6 +122,12 @@ describe('loadAiConfig', () => {
           model: 'Xenova/paraphrase-multilingual-MiniLM-L12-v2',
           cacheDir: '/models',
           timeoutMs: 8000,
+          idleMs: 5000,
+        },
+        'local-rerank': {
+          model: 'Xenova/bge-reranker-base',
+          cacheDir: '/models',
+          timeoutMs: 9000,
           idleMs: 5000,
         },
       },
