@@ -43,6 +43,8 @@ export interface PlannedNote {
   content: string;
   /** Position among all planned notes, parents first; encodes the sibling order. */
   order: number;
+  /** The input file the content comes from (a folder note's file too); null for plain folders. */
+  sourcePath: string | null;
 }
 
 export interface ImportPlan {

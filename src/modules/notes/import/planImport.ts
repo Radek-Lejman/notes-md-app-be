@@ -179,6 +179,7 @@ export function planImport(
       title: titles[index],
       content: contents[index].content,
       order,
+      sourcePath: node.fileIndex === null ? null : accepted[node.fileIndex].path,
     }));
 
   return { notes, report: { created: notes.length, skipped, warnings } };

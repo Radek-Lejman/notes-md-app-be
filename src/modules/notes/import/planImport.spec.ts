@@ -17,10 +17,31 @@ describe('planImport', () => {
     const { notes, report } = plan([file('Projects/Docker.md', '# Docker'), file('Inbox.md')]);
 
     expect(notes).toEqual([
-      { id: 'id-0', parentId: null, title: 'Import: Obsidian 2026-10-25', content: '', order: 0 },
-      { id: 'id-1', parentId: 'id-0', title: 'Inbox', content: 'text of Inbox.md', order: 1 },
-      { id: 'id-2', parentId: 'id-0', title: 'Projects', content: '', order: 2 },
-      { id: 'id-3', parentId: 'id-2', title: 'Docker', content: '# Docker', order: 3 },
+      {
+        id: 'id-0',
+        parentId: null,
+        title: 'Import: Obsidian 2026-10-25',
+        content: '',
+        order: 0,
+        sourcePath: null,
+      },
+      {
+        id: 'id-1',
+        parentId: 'id-0',
+        title: 'Inbox',
+        content: 'text of Inbox.md',
+        order: 1,
+        sourcePath: 'Inbox.md',
+      },
+      { id: 'id-2', parentId: 'id-0', title: 'Projects', content: '', order: 2, sourcePath: null },
+      {
+        id: 'id-3',
+        parentId: 'id-2',
+        title: 'Docker',
+        content: '# Docker',
+        order: 3,
+        sourcePath: 'Projects/Docker.md',
+      },
     ]);
     expect(report).toEqual({ created: 4, skipped: [], warnings: [] });
   });
@@ -141,6 +162,7 @@ describe('planImport', () => {
       expect(notes[1]).toMatchObject({
         title: 'Area A',
         content: '```yaml\ntitle: Area A\n```\n\nabout A',
+        sourcePath: 'A/index.md',
       });
       expect(notes[2]).toMatchObject({ parentId: notes[1].id, title: 'xx' });
     });
