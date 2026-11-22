@@ -1,6 +1,12 @@
 import type { FeatureExtractionPipeline } from '@huggingface/transformers';
 import { EmbeddingKind } from '../../types/embedding.types';
 import { LocalEmbeddingConfig } from '../../config/ai.config';
+import {
+  WorkerProcess as LocalWorkerProcess,
+  WorkerRequest as LocalWorkerRequest,
+  WorkerResponse as LocalWorkerResponse,
+} from './local-model.ipc';
+import { serveModel } from './local-model.serve';
 
 /**
  * Model side of the local embedding provider. Runs only in the worker process
@@ -11,26 +17,17 @@ import { LocalEmbeddingConfig } from '../../config/ai.config';
 /** Settings the worker needs (sent through its environment, no secrets). */
 export type WorkerConfig = Pick<LocalEmbeddingConfig, 'model' | 'cacheDir'>;
 
-export interface WorkerRequest {
-  id: number;
+export interface EmbedPayload {
   texts: string[];
 }
 
-export type WorkerResponse =
-  | { id: number; vectors: number[][] }
-  | {
-      id: number;
-      error: string;
-      /** The model could not be loaded at all. */ unavailable: boolean;
-    };
-
-/** The parts of `process` the worker uses (an IPC child). */
-export interface WorkerProcess {
-  on(event: 'message', listener: (message: WorkerRequest) => void): unknown;
-  on(event: 'disconnect', listener: () => void): unknown;
-  send(message: WorkerResponse): unknown;
-  exit(code?: number): unknown;
+export interface EmbedResult {
+  vectors: number[][];
 }
+
+export type WorkerRequest = LocalWorkerRequest<EmbedPayload>;
+export type WorkerResponse = LocalWorkerResponse<EmbedResult>;
+export type WorkerProcess = LocalWorkerProcess<EmbedPayload, EmbedResult>;
 
 export type LoadExtractor = (config: WorkerConfig) => Promise<FeatureExtractionPipeline>;
 
@@ -65,25 +62,9 @@ export function startWorker(
   config: WorkerConfig,
   load: LoadExtractor = loadExtractor,
 ): void {
-  let extractor: Promise<FeatureExtractionPipeline> | undefined;
-
-  proc.on('message', ({ id, texts }) => {
-    void (async () => {
-      let model: FeatureExtractionPipeline;
-      try {
-        model = await (extractor ??= load(config));
-      } catch (e) {
-        extractor = undefined; // retried on the next request
-        proc.send({ id, error: `model load failed: ${(e as Error).message}`, unavailable: true });
-        return;
-      }
-      try {
-        proc.send({ id, vectors: await embedWith(model, texts) });
-      } catch (e) {
-        proc.send({ id, error: `embed failed: ${(e as Error).message}`, unavailable: false });
-      }
-    })();
+  serveModel(proc, {
+    load: () => load(config),
+    handle: async (extractor, { texts }) => ({ vectors: await embedWith(extractor, texts) }),
+    operation: 'embed',
   });
-
-  proc.on('disconnect', () => proc.exit(0));
 }
