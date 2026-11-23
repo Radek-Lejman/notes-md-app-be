@@ -20,19 +20,20 @@
  */
 import { parseArgs } from 'node:util';
 import { NestFactory } from '@nestjs/core';
+import { RERANK_PROVIDER, RerankProvider } from '@ai';
 import { AppModule } from '../src/app.module';
 import { AI_MODULE_CONFIG, AiModuleConfig } from '../src/modules/ai/config/aiModule.config';
 import { mapGold } from '../src/modules/ai/rag/eval/dataset/goldMapping';
-import { EvalCase } from '../src/modules/ai/rag/eval/dataset/schema';
 import { readDataset } from '../src/modules/ai/rag/eval/dataset/readDataset';
 import { readVault } from '../src/modules/ai/rag/eval/dataset/readVault';
 import { findStale, hashVault } from '../src/modules/ai/rag/eval/dataset/staleness';
-import { scoreRetrieval } from '../src/modules/ai/rag/eval/metrics/retrieval';
-import { aggregate, CaseResult } from '../src/modules/ai/rag/eval/report/aggregate';
+import { aggregate } from '../src/modules/ai/rag/eval/report/aggregate';
 import { formatReport } from '../src/modules/ai/rag/eval/report/formatReport';
 import { EvalConfig } from '../src/modules/ai/rag/eval/run/evalConfig';
 import { assertRunLabel, datasetHash, toRunCase } from '../src/modules/ai/rag/eval/run/runRecord';
 import { RagSearchService } from '../src/modules/ai/rag/ragSearch.service';
+import { formatAbstention } from '../src/modules/ai/rag/eval/report/formatAbstention';
+import { runCases } from './rag-eval/runCases';
 import { prepareEvalIndex } from './rag-eval/evalIndex';
 import { EVAL_PATH_OPTIONS, evalPaths } from './rag-eval/evalPaths';
 import { saveRun } from './rag-eval/saveRun';
@@ -61,31 +62,6 @@ function readArgs() {
     label: values.label ?? null,
     compare: values.compare,
   };
-}
-
-/** Often enough to spot a slowing reranker (thermal throttling) early, rare enough to stay readable. */
-const PROGRESS_EVERY = 10;
-
-async function runCases(
-  search: RagSearchService,
-  { userId, cases, topK }: { userId: string; cases: EvalCase[]; topK: number },
-): Promise<CaseResult[]> {
-  const results: CaseResult[] = [];
-  const startedAll = performance.now();
-  for (const { id, type, question, gold } of cases) {
-    const started = performance.now();
-    const hits = await search.search(userId, question, topK);
-    const latencyMs = performance.now() - started;
-    results.push({ id, type, question, scores: scoreRetrieval(hits, gold), latencyMs });
-    if (results.length % PROGRESS_EVERY === 0 || results.length === cases.length) {
-      const elapsedMin = (performance.now() - startedAll) / 60_000;
-      console.log(
-        `progress: ${results.length}/${cases.length}, last ${(latencyMs / 1000).toFixed(1)}s, ` +
-          `elapsed ${elapsedMin.toFixed(1)} min`,
-      );
-    }
-  }
-  return results;
 }
 
 async function main() {
@@ -127,21 +103,27 @@ async function main() {
     );
     const { cases, unmapped } = mapGold(answerable, idByPath);
 
-    const results = await runCases(search, { userId, cases, topK: args.topK });
+    const unanswerable = all.filter((c) => c.type === 'unanswerable');
+    const reranker = app.get<RerankProvider | null>(RERANK_PROVIDER, { strict: false });
+    const { results, signals } = await runCases(
+      { search, reranker, userId, topK: args.topK },
+      cases,
+      unanswerable,
+    );
 
     const aggregates = aggregate(results);
-    const unanswerable = all.filter((c) => c.type === 'unanswerable').length;
     console.log(
       formatReport({
         config,
         aggregates,
         results,
         unmapped,
-        unanswerable,
+        unanswerable: unanswerable.length,
         stale,
         staleIncluded: args.includeStale,
       }),
     );
+    console.log(formatAbstention(signals).join('\n'));
 
     await saveRun(
       {

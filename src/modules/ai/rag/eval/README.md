@@ -12,30 +12,34 @@ Copied from `~/projects/second-brain-rag` @ `c5ef4b9` ("Eval harness for second-
 
 ## Files
 
-| File                            | From                       | Contents                                                                                                             |
-| ------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `metrics/retrieval.ts`          | `src/metrics/retrieval.ts` | `rankNotes`, `scoreRetrieval`, `RETRIEVAL_KS`                                                                        |
-| `metrics/stats.ts`              | `src/metrics/stats.ts`     | `mean`, `bootstrapCI`, `pairedBootstrapDiff` (seeded `mulberry32`)                                                   |
-| `dataset/schema.ts`             | `src/dataset/schema.ts`    | only `GoldRef`, `QuestionType`, `EvalCase`, `readJsonl` (zod)                                                        |
-| `metrics/retrieval.spec.ts`     | `tests/metrics.test.ts`    | ported from Vitest to Jest                                                                                           |
-| `metrics/stats.spec.ts`         | `tests/metrics.test.ts`    | bootstrap tests, plus PRNG/`mean` cases for 100% `test:ai` coverage                                                  |
-| `dataset/schema.spec.ts`        | —                          | new: `readJsonl` (comments, defaults, missing file, error line)                                                      |
-| `dataset/goldMapping.ts`        | —                          | new: `noteIdsByPath`, `mapGold` (vault path → note id, unmapped reported)                                            |
-| `dataset/readDataset.ts`        | —                          | new: a dataset file or folder of `.jsonl` files, ids unique across them                                              |
-| `dataset/readVault.ts`          | —                          | new: vault files in import format (dot folders skipped)                                                              |
-| `dataset/staleness.ts`          | `src/dataset/schema.ts`    | `hashVault`, `checkStaleness`, `findStale`, `pinHashes` (upstream: `checkStaleness`/`pinHashes`)                     |
-| `report/aggregate.ts`           | —                          | new: per-metric mean + bootstrap CI, overall and per question type                                                   |
-| `report/formatReport.ts`        | —                          | new: text report (config, CIs, per type, missed cases, unmapped)                                                     |
-| `run/evalConfig.ts`             | —                          | new: the retrieval settings a run depends on                                                                         |
-| `scripts/rag-eval.ts`           | —                          | new: the runner (`npm run rag:eval`)                                                                                 |
-| `run/indexCache.ts`             | —                          | new: index fingerprint (vault files + embedding model + chunk size/overlap) and the cache file                       |
-| `run/runRecord.ts`              | —                          | saved run schema (config, dataset hash, index fingerprint, per-case metrics), write/read, `--compare <label>` lookup |
-| `run/compareRuns.ts`            | —                          | paired bootstrap per metric on common case ids, verdict improvement / regression / noise                             |
-| `report/formatComparison.ts`    | —                          | text table of a comparison, with warnings (config, dataset, index changed)                                           |
-| `scripts/rag-eval/evalIndex.ts` | —                          | new: import into the eval user, indexing, cache reuse                                                                |
-| `scripts/rag-dataset.ts`        | `src/cli/dataset.ts`       | `npm run rag:dataset -- check \| pin [--ids a,b]`                                                                    |
-| `scripts/rag-eval/evalPaths.ts` | —                          | vault/dataset from flags or env, shared by both scripts                                                              |
-| `scripts/rag-eval/saveRun.ts`   | —                          | saves the run to `eval-runs/`, prints the comparison                                                                 |
+| File                             | From                       | Contents                                                                                                             |
+| -------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `metrics/retrieval.ts`           | `src/metrics/retrieval.ts` | `rankNotes`, `scoreRetrieval`, `RETRIEVAL_KS`                                                                        |
+| `metrics/stats.ts`               | `src/metrics/stats.ts`     | `mean`, `bootstrapCI`, `pairedBootstrapDiff` (seeded `mulberry32`)                                                   |
+| `dataset/schema.ts`              | `src/dataset/schema.ts`    | only `GoldRef`, `QuestionType`, `EvalCase`, `readJsonl` (zod)                                                        |
+| `metrics/retrieval.spec.ts`      | `tests/metrics.test.ts`    | ported from Vitest to Jest                                                                                           |
+| `metrics/stats.spec.ts`          | `tests/metrics.test.ts`    | bootstrap tests, plus PRNG/`mean` cases for 100% `test:ai` coverage                                                  |
+| `dataset/schema.spec.ts`         | —                          | new: `readJsonl` (comments, defaults, missing file, error line)                                                      |
+| `dataset/goldMapping.ts`         | —                          | new: `noteIdsByPath`, `mapGold` (vault path → note id, unmapped reported)                                            |
+| `dataset/readDataset.ts`         | —                          | new: a dataset file or folder of `.jsonl` files, ids unique across them                                              |
+| `dataset/readVault.ts`           | —                          | new: vault files in import format (dot folders skipped)                                                              |
+| `dataset/staleness.ts`           | `src/dataset/schema.ts`    | `hashVault`, `checkStaleness`, `findStale`, `pinHashes` (upstream: `checkStaleness`/`pinHashes`)                     |
+| `metrics/abstention.ts`          | —                          | new: `auroc`, `abstentionTable` (answerable vs unanswerable by best score)                                           |
+| `report/formatAbstention.ts`     | —                          | new: abstention section of the report, one block per confidence signal                                               |
+| `scripts/rag-eval/runCases.ts`   | —                          | new: the search loop (progress log; scores answerable cases, collects confidence of all)                             |
+| `scripts/rag-eval/confidence.ts` | —                          | new: best semantic score and the reranker's score of the top hit                                                     |
+| `report/aggregate.ts`            | —                          | new: per-metric mean + bootstrap CI, overall and per question type                                                   |
+| `report/formatReport.ts`         | —                          | new: text report (config, CIs, per type, missed cases, unmapped)                                                     |
+| `run/evalConfig.ts`              | —                          | new: the retrieval settings a run depends on                                                                         |
+| `scripts/rag-eval.ts`            | —                          | new: the runner (`npm run rag:eval`)                                                                                 |
+| `run/indexCache.ts`              | —                          | new: index fingerprint (vault files + embedding model + chunk size/overlap) and the cache file                       |
+| `run/runRecord.ts`               | —                          | saved run schema (config, dataset hash, index fingerprint, per-case metrics), write/read, `--compare <label>` lookup |
+| `run/compareRuns.ts`             | —                          | paired bootstrap per metric on common case ids, verdict improvement / regression / noise                             |
+| `report/formatComparison.ts`     | —                          | text table of a comparison, with warnings (config, dataset, index changed)                                           |
+| `scripts/rag-eval/evalIndex.ts`  | —                          | new: import into the eval user, indexing, cache reuse                                                                |
+| `scripts/rag-dataset.ts`         | `src/cli/dataset.ts`       | `npm run rag:dataset -- check \| pin [--ids a,b]`                                                                    |
+| `scripts/rag-eval/evalPaths.ts`  | —                          | vault/dataset from flags or env, shared by both scripts                                                              |
+| `scripts/rag-eval/saveRun.ts`    | —                          | saves the run to `eval-runs/`, prints the comparison                                                                 |
 
 Out of scope: the answerer, the LLM judge and the corpus loader.
 
@@ -74,6 +78,10 @@ The golden datasets are not in this repo: they are questions about a private vau
 Every run is saved to `eval-runs/<time>[_<label>].json` (gitignored): config, dataset hash, index fingerprint, excluded cases and per-case metrics. `--compare` pairs the new run with an earlier one on the case ids both scored and bootstraps the per-case differences: a metric is an improvement or a regression only when its 95% interval excludes 0, otherwise noise. Smaller is better for `contextTokens@5`.
 
 Change one thing per run, and read the warnings: a different dataset hash means labels changed; a different index fingerprint means the vault was edited or re-embedded, which alone moves a case or two. Search-time settings can be overridden per run from the shell (`RAG_HYBRID=false npm run rag:eval -- --compare baseline`), since the shell beats both env files. A run against itself should show `+0.000` everywhere (A/A test) except `latencyMs`, the search time per question, which is measured and so never repeats exactly: if anything else moves, something is nondeterministic. Reranking is a search-time setting too (`RAG_RERANK_PROVIDER=local npm run rag:eval -- --compare sem-ms03`); the run records the reranker model and `RAG_RERANK_CANDIDATES`, and `latencyMs` shows what it costs.
+
+### Abstention
+
+Unanswerable cases have no gold, so they get no retrieval metrics. They are still searched, to check whether the best score tells them apart from answerable ones, i.e. whether a "nothing relevant in your notes" threshold would work. Per signal (`semantic`: best cosine similarity, 0 when nothing passed `minScore`; `rerank`: the reranker's score of the top hit) the report prints AUROC (0.5 = the score says nothing, 1 = a perfect threshold exists) and, for keeping 99/95/90% of answerable questions, the threshold and the share of unanswerable ones it would reject. Not saved in the run file, so not compared between runs.
 
 ### Stale labels
 

@@ -41,11 +41,13 @@ Look at the missed cases and their question types:
 
 ### C. Some gold found, the rest missed: recall@10 much lower than hit@10, mostly `multi_hop` / `aggregation`
 
-| Pattern                                     | Try                                                                   |
-| ------------------------------------------- | --------------------------------------------------------------------- |
-| Several chunks of one note fill the list    | Diversify: cap chunks per note, MMR                                   |
-| Notes needed are about different sub-topics | Query decomposition into sub-questions, iterative (agentic) retrieval |
-| Simply not enough notes returned            | Larger `topK` (check the context cost)                                |
+| Pattern                                     | Try                                                                                                 |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Several chunks of one note fill the list    | Diversify: cap chunks per note, MMR                                                                 |
+| Notes needed are about different sub-topics | Query decomposition into sub-questions, iterative (agentic) retrieval (measured 2026-11, see below) |
+| Simply not enough notes returned            | Larger `topK` (check the context cost)                                                              |
+
+Measured on the author's vault (2026-11, semantic only): an LLM (Haiku) splitting list/overview/comparison questions into up to 4 searches fused with RRF raised `aggregation` recall@10 by ~6 points but left hit@5 and the overall metrics within noise, for an extra LLM call per question; a looser prompt that split half of all questions hurt `temporal` (the date got lost). Not adopted: the gain sits in ranks 6-10, while the chat's auto-context reads only the top few, and the agent already runs several searches for broad questions. The per-note chunk cap did not help either.
 
 ### D. Right notes, wrong or noisy context
 
@@ -56,7 +58,7 @@ Look at the missed cases and their question types:
 
 ### E. Unanswerable questions
 
-Not scored yet. Once they are: if the retriever returns confident hits for questions the vault cannot answer, calibrate the score threshold for abstention and make the answerer say "not in your notes".
+The report's abstention section shows whether the best score separates answerable from unanswerable questions (AUROC). Measured on the author's vault (2026-11): about 0.65 for both the cosine score and the reranker's score; a threshold that keeps 95% of answerable questions turns away only ~20% of unanswerable ones. So no "nothing found" cut-off in search: abstention belongs to the answerer ("not in your notes"), checked by the answer eval.
 
 ## 2. Retrieval is good, answers are still bad
 

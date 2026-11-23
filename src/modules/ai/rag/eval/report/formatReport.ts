@@ -13,7 +13,7 @@ export interface ReportInput {
   aggregates: Aggregates;
   results: CaseResult[];
   unmapped: UnmappedGold[];
-  /** Cases left out of retrieval scoring because they have no gold. */
+  /** Cases without gold: not scored for retrieval, only for abstention. */
   unanswerable: number;
   /** Cases whose gold notes changed or vanished since their hashes were pinned. */
   stale: StaleCase[];
@@ -79,7 +79,7 @@ function formatStale(stale: StaleCase[], included: boolean): string[] {
 export function formatReport(input: ReportInput): string {
   const missed = formatMissed(input.results);
   const lines = [
-    `RAG retrieval eval: ${input.results.length} cases scored, ${input.unanswerable} unanswerable skipped`,
+    `RAG retrieval eval: ${input.results.length} cases scored, ${input.unanswerable} unanswerable (abstention only, below)`,
     formatConfig(input.config),
     '',
     'Overall (mean [95% CI]):',

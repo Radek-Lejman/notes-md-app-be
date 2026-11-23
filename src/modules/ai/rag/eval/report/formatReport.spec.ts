@@ -46,7 +46,7 @@ describe('formatReport', () => {
   it('prints the config with the min score and the case counts', () => {
     const report = formatReport(input());
 
-    expect(report).toContain('3 cases scored, 2 unanswerable skipped');
+    expect(report).toContain('3 cases scored, 2 unanswerable (abstention only, below)');
     expect(report).toContain('minScore 0.45');
     expect(report).toContain('model bge-m3 · chunk 1500/200');
     expect(report).toContain('rerank off');
