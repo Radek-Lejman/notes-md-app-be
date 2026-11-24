@@ -57,6 +57,7 @@ Accept if: hit@1 about 0.70 and recall@10 above 0.85, no `regression` in any que
 - Memory: about 1 GB more for the reranker worker.
 - CPU latency: estimated 1–3 s per question at 40 candidates (measure, do not assume).
 - Production (Railway): the same cost. Enabled by default on 2026-11-22 (product decision); `RAG_RERANK_PROVIDER=none` turns it off.
+- Docker compose: off unless `RAG_RERANK_PROVIDER_DOCKER=local` (2026-11-25), until the model cache gets a volume; otherwise a recreated container downloads the model again on its first chat.
 
 ## Steps
 

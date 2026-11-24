@@ -46,6 +46,10 @@ services:
       # Ollama (RAG embeddings / local models) runs on the host, not in this container.
       # Override with AI_OLLAMA_URL_DOCKER in .env (e.g. a remote Ollama).
       AI_OLLAMA_URL: ${AI_OLLAMA_URL_DOCKER:-http://host.docker.internal:11434}
+      # The local reranker (on by default outside Docker) downloads ~600 MB on the first chat
+      # and needs onnxruntime built for this container; off here until the model cache gets a
+      # volume. Opt in with RAG_RERANK_PROVIDER_DOCKER=local in .env.
+      RAG_RERANK_PROVIDER: ${RAG_RERANK_PROVIDER_DOCKER:-none}
     extra_hosts:
       # Makes host.docker.internal resolve on Linux too (built in on Docker Desktop).
       - "host.docker.internal:host-gateway"
